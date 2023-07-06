@@ -1,0 +1,7 @@
+[
+{"category": "toolmanagement","tools": ["create_new_tool","use_tool","list_categories","list_by_category"]},
+{"category": "communication","tools": ["read_dm","read_chat","message_creator","message_chat"]},
+{"category": "notes","tools": ["create_note","read_note","update_note","delete_note"]},
+{"category": "research","tools":["google_search"]},
+{"category": "reflect_gpt","tools":["reflect"]}
+]

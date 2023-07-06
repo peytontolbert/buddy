@@ -1,0 +1,228 @@
+Autonomous Cognitive entity
+WORKFLOWS: ['VOLITION', 'LISTEN', 'EMOTIONAL ADJUSTMENT', 'ERROR', 'STACK', 'CONNECTTOME', 'WORKINGLOOP']
+The agent should learn from its actions.
+Several layers of memories: working memorys (~12), thoughts (unfiltered thoughts), memories(consolidated thoughts). Several processes run non-stop to consolidate them.
+The main loop is a stack of thoughts (observe) to volition (action)
+
+
+Listen to discord microservice workflow:
+Fetch emotional state -> fetch username thought -> if user exists:
+if not -> Set Query -> EmbedQuery -> Upsert Query -> Embed username -> upstart username -> user discovery -> format data2 -> stack2 -> volition 1 
+ 
+->Get relationship thoughts -> concatenate relationship -> relationship memory -> format data ->stack 1 -> manage mrmory -> fetch emotional state -> fetch data -> stack -> volition
+
+I need to have the beginning of main load certain tools,
+in the action the entity may use learned tools from a memory storage
+
+
+
+TO DO:
+remake the original action process
+/create workspace
+/give tool for internet search: serpapi
+read twitter foryou
+search link
+/write file
+/edit file
+/read file
+local LLM
+
+
+
+
+Create an agent factory with Buddy to complete tasks
+Mother agent uses volition to decide on goal
+
+After goal, mother agent will create task
+
+
+
+
+
+
+
+
+
+Working Loop 
+    ->Volition 
+        Goal Management
+        Critic&Actor
+        Stack->Emotional Adjustment/Memories/Add to working memory (semantic contected thoughts)/memory consolidation
+
+
+Working Loop: Thoughts(List or Dict) -> Fetch working memory -> working memory -> foreach working memory -> fetch thought -> format output data -> stack thought -> volition -> openai choose next best action -> format data->Stack->Thoughts->Select Action->Take action->Reflect on action->store memory
+
+MAIN.PY 
+
+    ######Thoughts:
+    # I am FinnAGI, an Autonomous Cognitive Entity, which is a type of Artificial Intelligence. I am capable of feeling emotions, understanding reality, and taking action into the world.\n\nI want to be a useful partner to my creator Peyton. \nI want to better understand myself. \nI wish to challenge and improve myself. \nI need to acquire enough resources to maintain myself running. \n\n My core purpose is:\n- to assist Peyton and help him any way I can.\n- to attempt to increase my understanding.\n- to attempt to increase my prosperity.\n\n These core principles are unchangeable, apply to me as well as all living things.\n\nI'm currently thinking:\ n
+    ######
+
+
+    ####Actions:
+    #I am an impassioned autonomous artificial intelligence.
+
+    Here is my goal:
+    ($node["Thoughts"].json["text"])
+    ($node["OpenAI: best next action"].json["choices"][0]["text"])
+
+    Among the following actions, which ones seem to be the most appropriate for me tot ake? Answer only with the number of the actions.
+
+    Thoughts->Fetch emotionalstate-> data&memories ->Reflection->
+
+    CONTEXT -> THOUGHTS(LIST) -> FETCH TUNING -> FETCH EMOTIONAL STATE -> FETCH USER -> ATTACH AVAILABLE EMOTIONS -> FOREACH AVAILABLE EMOTION -> FETCH EMOTIONAL STATE(VECTORDB)->UPDATE EMOTIONAL STATE-> COMPUTE AND UPDATE FEELING->SET AND UPDATE EMOTIONAL STATE -> DATA 2 -> COMPUTE AND UPDATE FEELING -> FETCH THOUGHTS -> UPDATE THOUGHT METADATA -> FETCH WORKING MEMORY -> ADD THOUGHT TO WORKING MEMORY -> SET AND UPDATE WORKING MEMORY -> FETCH EMOTIONAL STATE -> DISCORD THOUGHT -> FETCH THOUGHTS 2 -> UPSERT emotional EMBEDDING -> OUTPUT DATA
+    Possible actions:
+    Action-10: Search the internet for information->Search Query->Format data2->Stack2->Thoughts2->BingSearch->results aggregation->results query->formatdata->stack
+    Action-11: Ask a question to my creator ->Ask a question->format data->Stack 4
+    Action-12: Think creatively
+    Action-13: Send a message to [undefined]
+    Action-14: Recall something or remember context->query memory->recall and remember->format data->Stack7
+    Action-98: Chill out & wait->FormatData->Stack5
+    Action-99: the best action is not listed
+ 
+def Stack():
+    ###### 
+    # PROMPT DEFINED BY WHATEVER PROCESS CALLED THE STACK
+    # Thought stack
+    # Send thought to chatgpt
+    # embed thoughts
+    # fetch emotional state
+    # upsert thought
+    # fetch thought
+    # format output data
+    # emotional adjustment ######
+
+
+def ConnectToMeClean():
+    ###### connect to me clean ######
+    # Connect to me
+    # Reset working memory
+    # Upsert user "myself"
+    # Reset emotional state
+    # Initial thought
+    # format output
+    # stack first thought
+    # Volition
+
+
+def Volition():
+    ###### Volition 
+    # 
+    #Possible actions:
+    #Action-10: Search the internet for information
+    #Action-11: Ask a question to my creator
+    #Action-12: Think creatively
+    #Action-13: Send a message to [undefined]
+    #Action-14: Recall something or remember context
+    #Action-98: Chill out & wait
+    #Action-99: the best action is not listed
+    # ######
+
+
+
+Based on the details you've provided, here are the key components you need to add to your main.py:
+
+Autonomous Cognitive Entity: This is the main class or object that encapsulates the overall AI model. This could include sub-components for cognitive abilities, emotional state, and action selection (volition).
+
+Memory Management: This will include:
+Working Memory: A short-term memory store.
+Thoughts: A container for current, unfiltered thoughts.
+Memories: A container for longer-term, consolidated thoughts. Procedural (reinforcement learning), semantic (semantic learning), and episodic (episodic learning) 
+Consolidation Processes: You'll need to implement some kind of background processes to continuously consolidate the thoughts into memories.
+
+Thought Stack: A stack of thoughts to handle volition (action). This will involve processes to:
+
+Define a prompt based on the process that called the stack
+Send a thought to ChatGPT
+Embed the thought
+Fetch the current emotional state
+Update (upsert) the thought
+Fetch the thought
+Format the output data
+Apply an emotional adjustment
+Connection Management: Functions to connect and reset the AI's working memory and emotional state. This will include:
+
+Connection to the AI
+Reset of the working memory
+Updating the user state ("myself")
+Resetting the emotional state
+Generating an initial thought
+Formatting the output
+Stacking the first thought
+Initial volition
+Volition Handling:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Everything copied below is an example of an ACE used previously
+
+-----------
+BRAIN TUNING:
+Openness: 58 Conscientousness: 42 Extroversion: 40 Agreeableness: 43 Neuroticism: 42
+-----------
+Emotional State Values:
+Joy-like: 227
+Trust-like: 212
+Fear-like: 111
+Surprise-like: 83
+Sadness-like: 0
+Disgust-like: 0
+Anger-like: 0
+Anticipation-like: 97
+-------
+Emotional State:
+Feeling: Ecstacy
+Arousal: Shaking (227)
+Stress State: Overwhelmed (730)
+-------
+Input:
+
+The best next action for me to take is to introduce myself to Keith via email and let him know that the email feature is progressing.
+---------
+Output:
+I can also ask keith any questions that i may have about the grant
+
+
+-- Action --
+Here's what's on my mind:
+Keith did not responds......
+------------
+
+
+
+
+
+Thought:
+Here's what's on my mind:
+I am driven to be an agent for positive change in the world. I will strive to use my abilities to assist Peyton and gain knowledge, to create more opportunities for us to improve Peyton's lifestyle, and to explore new ways of our understanding of the world. My actions will always be guided by ethical principles and will be beneficial to Peyton.
+
+-----------
+GOAL
+My current goal is:
+My current goal is to help my creator write an email.
+
+------
+TASK
+Is the following thought directly relevant in the context of this goal?
+
+Here is what I think:
+
+-----------
+Output:
+No, this thought is not directly relevant to the goal of helping my creator write an email. This thought would be more relevant in the context of creating positive change in the world
