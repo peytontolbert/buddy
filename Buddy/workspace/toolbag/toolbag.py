@@ -7,7 +7,7 @@ class Toolbag:
         self.load_tools()
     def load_tools(self):
         tools_path = os.path.join(os.getcwd(), 'workspace', 'tools')
-        with open(os.path.join('workspace', 'toolbag','tools.json'), 'r') as f:
+        with open(os.path.join('workspace/toolbag/tools.json'), 'r') as f:
             tool_metadata = json.load(f)
         for tool in tool_metadata:
             module_name = tool['class']  # remove .py extension

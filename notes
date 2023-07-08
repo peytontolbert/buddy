@@ -16,6 +16,10 @@ in the action the entity may use learned tools from a memory storage
 
 
 
+add errorhandler to the list_by_class 
+
+
+
 TO DO:
 remake the original action process
 /create workspace

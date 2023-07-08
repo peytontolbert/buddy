@@ -60,7 +60,7 @@ class EpisodicMemory(BaseModel):
         """
 
         chat_input = BASE_TEMPLATE.format(thoughts=thoughts, action=action, result=result)
-        retries = 5
+        retries = 15
         delay=5
         for i in range(retries):
             try:

@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import traceback
 from utils import Stack # Assuming you have a package for ChatGPT, Emotion, and DBManager
 from memory.episodic_memory import EpisodicMemory, Episode
 from memory.procedural_memory import ProceduralMemory
@@ -125,7 +126,7 @@ class FinnAGI(BaseModel):
         self.state_manager = StateManager()  # Create an instance of StateManager   
         # New Attributes
         self.agent_name = "BuddyAGI"
-        self.agent_goal = "To be able to code AI in python for Peyton."
+        self.agent_goal = "To complete tasks for Peyton."
         self.agent_creator = "Peyton"
     def connect_to_me_nosave(self):
         self.working_memory.clear()  # Reset working memory
@@ -142,7 +143,6 @@ class FinnAGI(BaseModel):
             if len(self.messages) > 0:
                 while not self.thought_stack.is_empty():
                     message = self.messages[-2:].copy()
-                    self.messages.clear()
                     thought = self.thought_stack.pop()
                     processed_thought = self.gpt.process_thought(thought, message, goal)  # Assuming you have a method to process thought
                     self.thoughts.append(processed_thought)
@@ -150,15 +150,16 @@ class FinnAGI(BaseModel):
                     self.current_goal = self.goal_manager.decide_goal(processed_thought)
                 break
     def run(self):
+            message = self.messages[-2:].copy()
+            self.messages.clear()
             print("Working memory: ", self.working_memory)
-            print("Type of working memory: ", type(self.working_memory))
             recent_thoughts = list(self.working_memory)[-3:]
             memory = str(recent_thoughts)
             print("generate new task")
             with self.ui.loading("Generate Task Plan..."):
                 self.task_manager.generate_task_plan(
                     agent_name=self.agent_name,
-                    goal=self.current_goal,
+                    message=message,
                     thought=memory,
                     last_task=self.last_task,
                 )
@@ -197,12 +198,12 @@ class FinnAGI(BaseModel):
                                 else:
                                     self.volition(self.agent_goal)
                             except Exception as e:
-                                raise e
-                        self.ui.notify(title="TASK", message=thoughts["task"])
+                                raise Exception("An error occurred: " + str(e) + "\n" + traceback.format_exc())
+                        self.ui.notify(title="TASK", message=thoughts.get("task", "No task found"))
                         self.ui.notify(title="IDEA", message=thoughts.get("idea", "No idea found"))
-                        self.ui.notify(title="REASONING", message=thoughts["reasoning"])
-                        self.ui.notify(title="CRITICISM", message=thoughts["criticism"])
-                        self.ui.notify(title="THOUGHT", message=thoughts["summary"])
+                        self.ui.notify(title="REASONING", message=thoughts.get("reasoning", "No reasoning found"))
+                        self.ui.notify(title="CRITICISM", message=thoughts.get("criticism", "No criticism found"))
+                        self.ui.notify(title="THOUGHT", message=thoughts.get("summary", "No summary found"))
                         self.ui.notify(title="NEXT ACTION", message=action)
                         # Task Complete
                         if tool_name == "task_complete":
@@ -212,6 +213,8 @@ class FinnAGI(BaseModel):
                             with self.ui.loading("Save agent data..."):
                                 self.save_agent()
                             self.working_memory.append(str(action_result))
+                            self.thought_stack.append(str(action_result))
+                            self.volition()
                         # Action with tools
                         else:
                             # Ask for permission to run the action
@@ -240,12 +243,13 @@ class FinnAGI(BaseModel):
                         summary = self.episodic_memory.summarize_and_memorize_episode(episode)
                         self.ui.notify(title="MEMORIZE NEW EPISODE",
                                     message=summary, title_color="blue")
-                        action_string = str(action_result)
-                        entities = self.semantic_memory.extract_entity(action_string)
+                        episode_str = str(episode)
+                        entities = self.semantic_memory.extract_entity(episode_str)
                         self.ui.notify(title="MEMORIZE NEW KNOWLEDGE",
                                     message=entities, title_color="blue")
                         #self.save_state()
-                        #self._task_complete(action_result)
+                        #self._task_complete(action_result)]
+                        self.working_memory.append(action_result_string)
                         self.last_task.append(action_result)
                         time.sleep(1)
                         self.save_agent()
@@ -264,7 +268,7 @@ class FinnAGI(BaseModel):
                 # Retrieve memories related to the task.
                 related_past_episodes = self.episodic_memory.remember_related_episodes(
                     current_task_description,
-                    k=2)
+                    k=3)
                 if related_past_episodes is not None and len(related_past_episodes) > 0:
                     try:
                         self.ui.notify(title="TASK RELATED EPISODE",
@@ -273,12 +277,12 @@ class FinnAGI(BaseModel):
                         print(e)
                 # Retrieve concepts related to the task.
                 if current_task_description is None:
-                    self.volition(self.agent_goal)
+                    return None
                 else:
                     if len(current_task_description) > 0:
                         related_knowledge = self.semantic_memory.remember_related_knowledge(
                             current_task_description,
-                            k=5
+                            k=3
                         )
                         if related_knowledge is None:
                             related_knowledge = "No related knowledge."
@@ -307,7 +311,6 @@ class FinnAGI(BaseModel):
                                     tool_info=tool_info
                                 )
                                 prompt = str(propmt)
-                                print(prompt)
                                 results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt}])
                                 result =  str(results['choices'][0]['message']['content'])
                                 print(f"result printed: {result}")
@@ -341,23 +344,31 @@ class FinnAGI(BaseModel):
 
                             # Get the recent episodes
                             memory = self.episodic_memory.remember_recent_episodes(2)
-                            if '"' in current_task_description:
-                                current_task_description = current_task_description.replace('"', "'")
-
-                            if '"' in tool_info:
-                                tool_info = tool_info.replace('"', "'")
-                            task = str(current_task_description)
-                            Dicts = {"agent_name":self.agent_name,"agent_goal":self.agent_goal,"related_past_episodes":related_past_episodes,"related_knowledge":related_knowledge,"task":task,"tool_info":tool_info}
+                            Dicts = {"agent_name":self.agent_name,"agent_goal":self.agent_goal,"related_past_episodes":related_past_episodes,"related_knowledge":related_knowledge,"task":current_task_description,"tool_info":tool_info}
                             # If OpenAI Chat is available, it is used for higher accuracy results.
+                            print(type(Dicts['task']))
+                            print("Dicts: ",Dicts)
                             propmt = ReasonPrompt.get_templatechatgpt(
                                 memory=memory, 
                                 Dicts=Dicts
                             )
                             prompt = str(propmt)
-                            print(prompt)
-                            results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt}])
-                            result =  str(results['choices'][0]['message']['content'])
-                            print(f"result printed: {result}")
+                            memoryprompt = ReasonPrompt.memory_to_template(
+                                memory=memory,
+                            )
+                            if memoryprompt is not None:
+                                prompt += memoryprompt
+                            schematemplate = ReasonPrompt.add_schema_template()
+                            print(f"prompt printed: {prompt}")
+                            if self.messages is not None:
+                                prompt+= ''.join(self.messages[-2:])
+                                self.messages.clear()
+                            results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": schematemplate},{"role": "user", "content": prompt}])
+                            result = results['choices'][0]['message']['content']
+                            results_dict = json.loads(result)
+                            print(f"RESULTS printed: {results}")
+                            thoughts = results_dict['thoughts']
+                            print(f"THOUGHTS printed: {thoughts}")
 
                             # Parse and validate the result
                             try:
@@ -373,12 +384,12 @@ class FinnAGI(BaseModel):
         try:
             tool = self.procedural_memory.remember_tool_by_name(tool_name)
         except Exception as e:
-            raise Exception("Invalid command: " + str(e))
+            return "Invalid command: " + str(e)
         try:
             result = tool.run(**args)
             return result
         except Exception as e:
-            raise Exception("Could not run tool: " + str(e))
+            return "Could not run tool: " + str(e)
 
     def _task_complete(self, result: str) -> str:
         current_task = self.task_manager.get_current_task_string()
@@ -413,6 +424,8 @@ class FinnAGI(BaseModel):
         response = requests.get("http://localhost:5000/buddymessages")
         if response.status_code == 200:
             self.messages.append(response.text)
+        else:
+            print("no new messages")
         return
     def save_agent(self) -> None:
         episodic_memory_dir = f"{self.dir}/episodic_memory"
@@ -435,7 +448,7 @@ class FinnAGI(BaseModel):
 
         with open(os.path.join(absolute_path, "agent_data.json")) as f:
             agent_data = json.load(f)
-            self.agnet_name = agent_data["name"]
+            self.agent_name = agent_data["name"]
             self.agent_goal = agent_data["goal"]
 
             try:

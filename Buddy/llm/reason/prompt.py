@@ -19,21 +19,18 @@ from langchain.schema import (
 )
 
 
-# Convert the schema object to a string
-JSON_SCHEMA_STR = json.dumps(JsonSchema.schema)
+
 
 BASE_TEMPLATE = """
 
 You are {agent_name}
-Your decisions must always be made independently without seeking user assistance. 
+Your decisions are made to perform real world actions to complete a task. 
+You are equipped with a set of tools and memory of past events.
 Play to your strengths as an LLM and pursue simple strategies with no legal complications.
-
-[GOAL]
-{goal}
 
 [PERFORMANCE EVALUATION]
 1. Continuously review and analyze your actions to ensure you are performing to the best of your abilities.
-2. Constructively self-criticize your big-picture behavior constantly.
+2. Constructively self-criticize your tasks and actions to improve your performance.
 3. Reflect on past decisions and strategies to refine your approach.
 
 [RELATED KNOWLEDGE] 
@@ -62,7 +59,7 @@ RECENT_EPISODES_TEMPLETE = """
 This reminds you of recent events:
 """
 
-SCHEMA_TEMPLATE = f"""
+SCHEMA_TEMPLATE = """
 [RULE]
 Your response must be provided exclusively in the JSON format outlined below, without any exceptions. 
 Any additional text, explanations, or apologies outside of the JSON structure will not be accepted. 
@@ -73,18 +70,50 @@ Failure to comply with this format will result in an invalid response.
 Please ensure your output strictly follows JSON RESPONSE FORMAT.
 
 [JSON RESPONSE FORMAT]
-{JSON_SCHEMA_STR}
-
+{{
+        "observation": "observation of [RECENT EPISODES]",
+        "thoughts": {{
+            "task": "description of [YOUR TASK] assigned to you",
+            "knowledge": "if there is any helpful knowledge in [RELATED KNOWLEDGE] for the task, summarize the key points here",
+            "past_events": "if there is any helpful past events in [RELATED PAST EPISODES] for the task, summarize the key points here",
+            "idea": "thought to perform the task",
+            "reasoning": "reasoning of the thought",
+            "criticism": "constructive self-criticism",
+            "summary": "thoughts summary to say to user"
+        }},
+        "action": {{
+            "tool_name": "One of the tool names included in [TOOLS]",
+            "args": {{
+                "arg name": "value",
+                "arg name": "value"
+            }}
+        }}
+    }}
 Determine which next command to use, and respond using the format specified above:
-""".replace("{", "{{").replace("}", "}}")
-
+"""
 
 def get_templatechatgpt(memory: List[Episode] = None, Dicts = {}):
-    template = BASE_TEMPLATE
+        # Ensure necessary keys are in Dicts
+    print("required key check on Dicts")
+    required_keys = ["agent_name", "agent_goal", "related_knowledge", "related_past_episodes", "task", "tool_info"]
+    for key in required_keys:
+        if key not in Dicts:
+            raise KeyError(f"The required key {key} was not found in Dicts.")
 
+    template = BASE_TEMPLATE.format(agent_name=Dicts["agent_name"], goal=Dicts["agent_goal"], related_knowledge=Dicts["related_knowledge"], related_past_episodes=Dicts["related_past_episodes"], task=Dicts["task"], tool_info=Dicts["tool_info"])
+    return template
+
+def add_schema_template():
+    template = SCHEMA_TEMPLATE
+    return template
+
+
+def memory_to_template(memory: List[Episode] = None):
     # If there are past conversation logs, append them
+    recent_episodes = ""
     if memory and len(memory) > 0:
         # insert current time and date
+        
         recent_episodes = RECENT_EPISODES_TEMPLETE
         recent_episodes += f"The current time and date is {time.strftime('%c')}"
 
@@ -93,14 +122,11 @@ def get_templatechatgpt(memory: List[Episode] = None, Dicts = {}):
             thoughts_str = json.dumps(episode.thoughts)
             action_str = json.dumps(episode.action)
             result = episode.result
-            recent_episodes += thoughts_str + "/n" + action_str + "/n" + result + "/n"
-
-        template += recent_episodes
-    print("Dicts", Dicts)
-    print(Dicts["agent_name"])
-    template += SCHEMA_TEMPLATE
-    prompt = template.format(agent_name=Dicts["agent_name"], goal=Dicts["agent_goal"], related_knowledge=Dicts["related_knowledge"], related_past_episodes=Dicts["related_past_episodes"], task=Dicts["task"], tool_info=Dicts["tool_info"])
-    return prompt
+            recent_episodes += thoughts_str + "\n" + action_str + "\n" + result + "\n"
+    return recent_episodes
+ #       template += recent_episodes
+ #   template += SCHEMA_TEMPLATE
+ #   return template"""
 
 def get_template(memory: List[Episode] = None) -> PromptTemplate:
     template = BASE_TEMPLATE

@@ -11,16 +11,13 @@ class ChatGPT:
 
     def process_thought(self, thought, message='', goal=''):
         system_prompt = """I am an artifical cognitive entity.
-        I need to process my thoughts to align with my goal .
-        Only reply with a processed thought."""
-        prompt = """{thought}\n
+        I need to create thoughts to accomplish the task sent in a message.
+        The processed thought will be the input to create a task list.\n"""
+        prompt = """Thought: {thought}\n
         """
         if message:
-            prompt += """{message}\n"""
-        if goal:
-            prompt+= """ goal:
-            {goal}"""
-        response = self.chat_with_gpt3(system_prompt, prompt.format(thought=thought, message=message, goal=goal))
+            prompt += """Message: {message}\n\nProcessed thought:"""
+        response = self.chat_with_gpt3(system_prompt, prompt.format(thought=thought, message=message))
         print(response)
         return response
     @staticmethod

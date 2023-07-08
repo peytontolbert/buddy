@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from jsonschema import validate, ValidationError
 from langchain.llms.base import BaseLLM
 import contextlib
-
+from marvin import ai_fn
 
 class LLMJsonOutputParserException(Exception):
     """Exception for JSON parsing errors"""
@@ -25,6 +25,26 @@ class ValidateJsonException(LLMJsonOutputParserException):
 class FixJsonException(LLMJsonOutputParserException):
     """Exception for JSON fixing errors"""
     pass
+
+
+
+@ai_fn()
+def auto_fix_json(json_str: str, schema: str) -> str:
+    """
+    Fixes the provided JSON string to make it parseable and fully complient with the provided schema.
+    If an object or field specified in the schema isn't contained within the correct JSON,
+    it is ommited.\n This function is brilliant at guessing  when the format is incorrect.
+
+    Parameters:
+    description: str
+        The description of the function
+    function: str
+        The function to run
+
+    Returns:
+    str
+        The fixed JSON string it is valid.
+    """
 
 
 class LLMJsonOutputParser(BaseModel):

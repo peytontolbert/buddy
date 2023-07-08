@@ -35,10 +35,6 @@ class SemanticMemory(BaseModel):
         JSON_SCHEMA_STR = json.dumps(JsonSchema.schema)
                 
         ENTITY_EXTRACTION_TEMPLATE = """
-            You are an AI assistant reading a input text and try to extract entities from it.
-            Extract ONLY proper nouns from the input text and return them as a JSON object.
-            You should definitely extract all names and places.
-            USE THE EXAMPLE FOR REFERENCE ONLY.
 
             [EXAMPLE]
             INPUT TEXT:
@@ -56,11 +52,14 @@ class SemanticMemory(BaseModel):
                 "Steve Jobs": "an American entrepreneur, business magnate, inventor, and industrial designer who co-founded Apple Computer Company with Steve Wozniak and Ronald Wayne, and later founded NeXT",
                 "Ronald Wayne": "an American retired electronics industry worker and co-founder of Apple Computer Company, who left the company after only 12 days"
             }}
-            [INPUT TEXT] (for reference only):
-            {text}
+            [INPUT TEXT]
             """
 
-        SCHEMA_TEMPLATE = f"""
+
+        SCHEMA_TEMPLATE = """
+            You are an AI assistant reading a input text and trying to extract entities from it.
+            Extract ONLY proper nouns from the input text and return them as a JSON object.
+            You should definitely extract all names and places.
             [RULE]
             Your response must be provided exclusively in the JSON format outlined below, without any exceptions. 
             Any additional text, explanations, or apologies outside of the JSON structure will not be accepted. 
@@ -77,14 +76,22 @@ class SemanticMemory(BaseModel):
                 "entity3": "description of entity3. Please describe the entities using sentences rather than single words."
             }}
 
-            [RESPONSE]"""
+            [EXAMPLE]"""
+        
+        PROMPT_TEMPLATE = """
+            INPUT TEXT:
 
+            {text}
+
+            RESPONSE:
+            """
         # If OpenAI Chat is available, it is used for higher accuracy results.
-        propmt = ENTITY_EXTRACTION_TEMPLATE.format(text=text)
+        example = ENTITY_EXTRACTION_TEMPLATE
         schema = SCHEMA_TEMPLATE
-        prompt = str(propmt + "\n"+schema)
-        results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt}])
+        prompt = PROMPT_TEMPLATE.format(text=text)
+        results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role":"system","content": schema},{"role":"system","content":example},{"role": "user", "content": prompt}])
         result =  str(results['choices'][0]['message']['content'])
+        print(result)
 
         # Parse and validate the result
         try:

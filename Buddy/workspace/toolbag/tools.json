@@ -4,7 +4,7 @@
         "description":"With this tool, you can create new tools for youself.\nAfter creation, you will be able to use this tool.\nWhen you want make a tool, you can use this tool to do so.",
         "func":"toolmanagement.create_tool",
         "class":"toolmanagement",
-        "args":{"name":"str","description":"str","func":"str","args":"Dict","class":"str"},
+        "args":{"name":"str","description":"str","func":"str","genre":"str","args":"Dict"},
         "user_permission_required":"False"
     },
     {

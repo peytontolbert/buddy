@@ -1,5 +1,6 @@
 import json
 import openai
+import time
 from pydantic import BaseModel, Field
 from pydantic import BaseModel, Field
 from langchain.llms.base import BaseLLM
@@ -22,17 +23,18 @@ class TaskManager(BaseModel):
     tasks: List[Task] = Field([], description="The list of tasks")
     current_task_id: int = Field(1, description="The last task id")
 
-    def generate_task_plan(self, agent_name: str, goal: str, thought: str, last_task=None):
+    def generate_task_plan(self, agent_name: str, message: str, thought: str, last_task=None, retries=5, delay=5):
         """Generate a task plan for the agent."""
         propmt = get_template()                
         BASE_TEMPLATE = """
         You are {agent_name}
-        Your should create task that uses the result of an execution agent
-        to create a new task with the following GOAL:
+        You should create a task list to accomplish the following objective
+        to create a new task from the following message:
 
-        [GOAL]
-        {goal}
+        [MESSAGE]
+        {message}
 
+        
         [LAST TASK I DID]
         {last_task}
 
@@ -40,9 +42,9 @@ class TaskManager(BaseModel):
         {thought}
 
         [YOUR MISSION]
-        Based on the [GOAL], create new task to be completed by the AI system that do not overlap with incomplete tasks.
-        - Tasks should be calculated backward from the GOAL, and effective arrangements should be made.
-        - You can create any number of tasks.
+        Based on the [MESSAGE], create new task to be completed by the AI system that do not overlap with incomplete tasks.
+        - Tasks should be calculated backward from the message, and effective arrangements should be made.
+        - Create up to 5 tasks at a time.
 
         [RESPONSE FORMAT]
         Return the tasks as a list of string.
@@ -55,28 +57,34 @@ class TaskManager(BaseModel):
 
         [RESPONSE]
         """
-        chat_input = BASE_TEMPLATE.format(thought=thought, agent_name=agent_name, goal=goal, last_task=last_task)
-        try:
-            
-            results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": chat_input}])
-            result =  str(results['choices'][0]['message']['content'])
-            print(result)
-        except Exception as e:
-            raise Exception(f"Error: {e}")
+        chat_input = BASE_TEMPLATE.format(thought=thought, agent_name=agent_name, message=message, last_task=last_task)
+        
+        for i in range(retries):
+            try:
+                
+                results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": chat_input}])
+                result =  str(results['choices'][0]['message']['content'])
+                print(result)
+            except openai.error.ServiceUnavailableError:
+                if i < retries - 1:
+                    time.sleep(delay)
+                else:
+                    raise
 
-        # Parse and validate the result
-        try:
-            result_list = LLMListOutputParser.parse(result, separeted_string="\t")
-        except Exception as e:
-            raise Exception("Error: " + str(e))
 
-        # Add tasks with a serial number
-        for i, e in enumerate(result_list, start=1):
-            id = int(i)
-            description = e
-            self.tasks.append(Task(id=id, description=description))
+            # Parse and validate the result
+            try:
+                result_list = LLMListOutputParser.parse(result, separeted_string="\t")
+            except Exception as e:
+                raise Exception("Error: " + str(e))
 
-        self
+            # Add tasks with a serial number
+            for i, e in enumerate(result_list, start=1):
+                id = int(i)
+                description = e
+                self.tasks.append(Task(id=id, description=description))
+
+            self
 
     def get_task_by_id(self, id: int) -> Task:
         """Get a task by Task id."""

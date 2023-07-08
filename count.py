@@ -19,5 +19,5 @@ def count_lines_in_dir(dir_path):
     return total_lines
 
 # replace "your_directory_path" with your actual directory path
-dir_path = "Finn"
+dir_path = "Buddy"
 print(f"Total lines: {count_lines_in_dir(dir_path)}")
