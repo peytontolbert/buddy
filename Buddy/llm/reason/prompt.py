@@ -48,7 +48,7 @@ You are given the following task:
 {task}
 
 [TOOLS]
-You can ONLY ONE TOOL at a time. Try not to repeat a tool too many times. Switch tools if you are stuck.
+You can ONLY ONE TOOL at a time. Try not to repeat the same action. Make sure you use task_complete if you think you have completed the task. You can request assistance with message_creator tool.
 tool name: "tool description", arg1: <arg1>, arg2: <arg2>
 {tool_info}
 task_complete: "If you think you have completed the task, please use this tool to mark it as done and include your answer to the task in the 'args' field.", result: <Answer to the assigned task>

@@ -17,7 +17,7 @@ class toolmanagement:
             logging.error(f"Error: {e}")
             return f"Error: {e}"
 
-    def create_tool(self, name, func, args, description, genre):
+    def create_tool(self, name, func, args, description, genre, function):
         if not all([name, func, args, description, genre]):
             return "All parameters must be provided."
             
@@ -63,7 +63,8 @@ class toolmanagement:
         classes = [tool['class'] for tool in self.tools if tool['class'] not in classes]
         return classes
 
-    def create_new_class(self, string):
+    def create_new_class(self, genre):
+        string = str(genre)
         if not string or not string.isidentifier():
             error_message = "Invalid python class name."
             logging.error(error_message)

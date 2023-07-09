@@ -133,3 +133,55 @@ class TaskManager(BaseModel):
         for task in self.get_incomplete_tasks():
             result += self._task_to_string(task) + "\n"
         return result
+    def modify_current_task(self, task):
+        prompt = """You have attempted this task three times, and need to modify the task to make it easier to complete.
+        [TASK]
+        {task}
+        
+        [YOUR MISSION]
+        Based on the [MESSAGE], create new task to be completed by the AI system that do not overlap with incomplete tasks.
+        - Tasks should be calculated backward from the message, and effective arrangements should be made.
+        - Create up to 5 tasks at a time.
+
+        [RESPONSE FORMAT]
+        Return the tasks as a list of string.
+        - Enclose each task in double quotation marks.
+        - Separate tasks with Tabs.
+        - Reply in first-person.
+        - Use [] only at the beginning and end
+
+        ["Task 1 that I should perform"\t"Task 2 that I should perform",\t ...]
+
+        [RESPONSE]
+        """
+        retries=15
+        delay=10
+        newprompt = prompt.format(task=task)       
+        for i in range(retries):
+            try:
+                
+                results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": newprompt}])
+                result =  str(results['choices'][0]['message']['content'])
+                print(result)
+            except openai.error.ServiceUnavailableError:
+                if i < retries - 1:
+                    time.sleep(delay)
+                else:
+                    raise
+
+
+            # Parse and validate the result
+            try:
+                result_list = LLMListOutputParser.parse(result, separeted_string="\t")
+            except Exception as e:
+                raise Exception("Error: " + str(e))
+
+            # Add tasks with a serial number
+            for i, e in enumerate(result_list, start=1):
+                id = int(i)
+                description = e
+                self.tasks.append(Task(id=id, description=description))
+
+            self
+
+        return 

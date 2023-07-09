@@ -35,7 +35,7 @@ DEFAULT_AGENT_NAME = "FinnAGI"
 DEFAULT_AGENT_GOAL = "To gain knowledge through thinking and using my tools so I can apply them to help Peyton my creator."
 DEFAULT_AGENT_DIR = "./agent_data"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Define the schema for the llm output
 REASON_JSON_SCHEMA_STR = json.dumps(ReasonSchema.schema)
@@ -150,6 +150,7 @@ class FinnAGI(BaseModel):
                     self.current_goal = self.goal_manager.decide_goal(processed_thought)
                 break
     def run(self):
+            task_attempts = {}
             message = self.messages[-2:].copy()
             self.messages.clear()
             print("Working memory: ", self.working_memory)
@@ -176,17 +177,21 @@ class FinnAGI(BaseModel):
                     while True:
                         #current_task = self.task_manager.get_current_task_string()
                         current_task = self.task_manager.get_current_task_string()
-                        if current_task:
+                        if current_task is None:
+                            self.volition(self.agent_goal)
+                        else:
                             self.ui.notify(title="CURRENT TASK",
                                         message=current_task,
                                         title_color="BLUE")
-                        else:
-                            self.ui.notify(title="FINISH",
-                                        message=f"All tasks are completed. Retrieving new goal",
-                                        title_color="RED")
-                            self.thought_stack.push(self.thoughts)
-                            self.volition(self.agent_goal)
+                            self.thought_stack.push(recent_thoughts[-1:])
                         #ReAct: Reasoning
+                        if task_attempts.get(current_task, 0) > 3:
+                            current_task = self.task_manager.generate_task_plan(
+                                agent_name=self.agent_name,
+                                message=message,
+                                thought=memory,
+                                last_task=self.last_task)
+                            self.ui.notify(title="MODIFIED TASK", message=current_task, title_color="BLUE")
                         with self.ui.loading("Thinking..."):
                             try:
                                 reasoning_result = self._reason()
@@ -253,6 +258,7 @@ class FinnAGI(BaseModel):
                         self.last_task.append(action_result)
                         time.sleep(1)
                         self.save_agent()
+                        task_attempts[current_task] = task_attempts.get(current_task, 0)+1
                         #self.volition(self.agent_name, self.agent_goal)
                     # Perform the selected action
                     #self.action_manager.perform_action(action, thought)
@@ -311,9 +317,11 @@ class FinnAGI(BaseModel):
                                     tool_info=tool_info
                                 )
                                 prompt = str(propmt)
+                                if self.messages is not None:
+                                    prompt+= ''.join(self.messages[-2:])
+                                    self.messages.clear()
                                 results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt}])
                                 result =  str(results['choices'][0]['message']['content'])
-                                print(f"result printed: {result}")
 
                             else:
                                return None
@@ -346,8 +354,6 @@ class FinnAGI(BaseModel):
                             memory = self.episodic_memory.remember_recent_episodes(2)
                             Dicts = {"agent_name":self.agent_name,"agent_goal":self.agent_goal,"related_past_episodes":related_past_episodes,"related_knowledge":related_knowledge,"task":current_task_description,"tool_info":tool_info}
                             # If OpenAI Chat is available, it is used for higher accuracy results.
-                            print(type(Dicts['task']))
-                            print("Dicts: ",Dicts)
                             propmt = ReasonPrompt.get_templatechatgpt(
                                 memory=memory, 
                                 Dicts=Dicts
@@ -359,16 +365,15 @@ class FinnAGI(BaseModel):
                             if memoryprompt is not None:
                                 prompt += memoryprompt
                             schematemplate = ReasonPrompt.add_schema_template()
-                            print(f"prompt printed: {prompt}")
                             if self.messages is not None:
                                 prompt+= ''.join(self.messages[-2:])
                                 self.messages.clear()
                             results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": schematemplate},{"role": "user", "content": prompt}])
                             result = results['choices'][0]['message']['content']
-                            results_dict = json.loads(result)
-                            print(f"RESULTS printed: {results}")
-                            thoughts = results_dict['thoughts']
-                            print(f"THOUGHTS printed: {thoughts}")
+                            #results_dict = json.loads(result)
+                            #print(f"RESULTS printed: {results}")
+                            #thoughts = results_dict['thoughts']
+                            #print(f"THOUGHTS printed: {thoughts}")
 
                             # Parse and validate the result
                             try:
@@ -390,7 +395,9 @@ class FinnAGI(BaseModel):
             return result
         except Exception as e:
             return "Could not run tool: " + str(e)
-
+    def modify_task(self, task):
+        new_task = self.task_manager.modify_current_task(task)
+        return new_task
     def _task_complete(self, result: str) -> str:
         current_task = self.task_manager.get_current_task_string()
         self.last_task = current_task
