@@ -10,7 +10,7 @@ class filemanager:
 
     def view_file(self, file_path):
         current_dir = os.getcwd()
-        workspace_folder = os.path.join(current_dir, "workspace")
+        workspace_folder = os.path.join(current_dir, "workspace","work")
         file = os.path.join(workspace_folder, file_path)
         try:
             with open(file, "r") as f:
@@ -21,7 +21,7 @@ class filemanager:
 
     def view_workspace(self):
         current_dir = os.getcwd()
-        workspace_folder = os.path.join(current_dir, "workspace")
+        workspace_folder = os.path.join(current_dir, "workspace","work")
         try:
             files = os.listdir(workspace_folder)
             return files
@@ -31,7 +31,7 @@ class filemanager:
 
     def view_files(self, path):
         current_dir = os.getcwd()
-        workspace_folder = os.path.join(current_dir, "workspace")
+        workspace_folder = os.path.join(current_dir, "workspace","work")
         full_path = os.path.join(workspace_folder, path)
 
         try:
@@ -44,7 +44,7 @@ class filemanager:
 
     def edit_file(self, file_path, content):
         current_dir = os.getcwd()
-        workspace_folder = os.path.join(current_dir, "workspace")
+        workspace_folder = os.path.join(current_dir, "workspace","work")
         file = os.path.join(workspace_folder, file_path)
         try:
             with open(file, "w") as f:

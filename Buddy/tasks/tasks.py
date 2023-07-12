@@ -23,28 +23,18 @@ class TaskManager(BaseModel):
     tasks: List[Task] = Field([], description="The list of tasks")
     current_task_id: int = Field(1, description="The last task id")
 
-    def generate_task_plan(self, agent_name: str, message: str, thought: str, last_task=None, retries=5, delay=5):
-        """Generate a task plan for the agent."""
-        propmt = get_template()                
+    def generate_task_plan(self, message: str, retries=5, delay=5):
+        """Generate a task plan for the agent."""      
         BASE_TEMPLATE = """
-        You are {agent_name}
-        You should create a task list to accomplish the following objective
-        to create a new task from the following message:
+        You should create a task that uses the result of an execution agent
+        to create a new task with the following GOAL:
 
-        [MESSAGE]
+        [MESSAGE FROM THE AGENT]
         {message}
 
-        
-        [LAST TASK I DID]
-        {last_task}
-
-        [THOUGHTS]
-        {thought}
-
         [YOUR MISSION]
-        Based on the [MESSAGE], create new task to be completed by the AI system that do not overlap with incomplete tasks.
-        - Tasks should be calculated backward from the message, and effective arrangements should be made.
-        - Create up to 5 tasks at a time.
+        Based on the [THOUGHTS], create new task to be completed by the AI system that do not overlap with incomplete tasks.
+        - You can create any number of tasks.
 
         [RESPONSE FORMAT]
         Return the tasks as a list of string.
@@ -57,7 +47,7 @@ class TaskManager(BaseModel):
 
         [RESPONSE]
         """
-        chat_input = BASE_TEMPLATE.format(thought=thought, agent_name=agent_name, message=message, last_task=last_task)
+        chat_input = BASE_TEMPLATE.format(message=message)
         
         for i in range(retries):
             try:
@@ -105,6 +95,64 @@ class TaskManager(BaseModel):
         else:
             return self._task_to_string(task)
 
+    def eval_action(self, action: str, message: None) -> bool:
+        """Evaluate an action."""
+        prompt = """You are an intelligent agent. You should evaluate and modify a task list based on the following action:
+        [RECENT ACTION]
+        {action}
+        
+        [MESSAGE]
+        {message}
+
+        [TASK]
+        {tasks}
+
+        [YOUR MISSION]
+        Based on the recent action, response with a new task list to satisfy the objective.
+        - Tasks should be simple enough to solve with a single action.
+        - Create up to 5 tasks at a time.
+
+        [RESPONSE FORMAT]
+        Return the tasks as a list of string.
+        - Enclose each task in double quotation marks.
+        - Separate tasks with Tabs.
+        - Reply in first-person.
+        - Use [] only at the beginning and end
+
+        ["Task 1 that I should perform"\t"Task 2 that I should perform",\t ...]
+
+        [RESPONSE]
+        """
+        chat_input = prompt.format(action=action, tasks=self.get_incomplete_tasks_string(), message=message)
+        retries, delay = 20, 5     
+        for i in range(retries):
+            try:
+                
+                results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": chat_input}])
+                result =  str(results['choices'][0]['message']['content'])
+                print(result)
+            except openai.error.ServiceUnavailableError:
+                if i < retries - 1:
+                    time.sleep(delay)
+                else:
+                    raise
+
+
+            # Parse and validate the result
+            try:
+                result_list = LLMListOutputParser.parse(result, separeted_string="\t")
+            except Exception as e:
+                raise Exception("Error: " + str(e))
+
+            # Add tasks with a serial number
+            for i, e in enumerate(result_list, start=1):
+                id = int(i)
+                description = e
+                self.tasks.clear
+                self.tasks.append(Task(id=id, description=description))
+
+            self
+
     def complete_task(self, id: int, result: str) -> None:
         """Complete a task by Task id."""
         # Complete the task specified by ID
@@ -133,15 +181,15 @@ class TaskManager(BaseModel):
         for task in self.get_incomplete_tasks():
             result += self._task_to_string(task) + "\n"
         return result
-    def modify_current_task(self, task):
+    def modify_current_task(self, thought):
         prompt = """You have attempted this task three times, and need to modify the task to make it easier to complete.
-        [TASK]
-        {task}
+        [FULL REQUEST]
+        {thought}
         
-        [YOUR MISSION]
-        Based on the [MESSAGE], create new task to be completed by the AI system that do not overlap with incomplete tasks.
-        - Tasks should be calculated backward from the message, and effective arrangements should be made.
-        - Create up to 5 tasks at a time.
+        
+        
+        [CURRENT TASK LIST]
+        {tasks}
 
         [RESPONSE FORMAT]
         Return the tasks as a list of string.
@@ -156,7 +204,7 @@ class TaskManager(BaseModel):
         """
         retries=15
         delay=10
-        newprompt = prompt.format(task=task)       
+        newprompt = prompt.format(thought=thought, tasks=self.tasks)       
         for i in range(retries):
             try:
                 
@@ -180,8 +228,36 @@ class TaskManager(BaseModel):
             for i, e in enumerate(result_list, start=1):
                 id = int(i)
                 description = e
+                self.tasks.clear()
                 self.tasks.append(Task(id=id, description=description))
 
             self
 
-        return 
+        return  self.get_current_task_string()
+    
+    def clarify (self, message:str ) -> str:
+        prompt = """You will read a instruction for a task. You will not carry out those instructions.
+Specifically you will first summarise a list of areas that need clarification.
+Then you will pick one clarifying question, and wait for an answer from the user.
+[EXAMPLE-MESSAGE]
+Code me an html server
+
+Reply in JSON format, for example:
+[RESPONSE]
+{{"task": "code an html server", "questions: ["what programming language should I use?", "should I use any libraries?", "any other features to add to the server?"]}}
+
+[MESSAGE]
+{message}
+"""
+        retries, delay = 20, 5
+        for i in range(retries):
+            try:
+                results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt.format(message=message)}])
+                return results['choices'][0]['message']['content']
+            except openai.error.ServiceUnavailableError:
+                if i < retries - 1:  # i is zero indexed
+                    time.sleep(delay)  # wait before trying again
+                else:
+                    raise  # re-raise the last exception if all retries fail
+
+

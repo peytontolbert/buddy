@@ -66,7 +66,6 @@ def main():
             )
             print(tool_instance)
             finnagi.procedural_memory.memorize_tools([tool_instance])
-        finnagi.connect_to_me_nosave()
         while not main_stop_event.is_set():
             try:
                 window.write_event_value('-UPDATE-', (str(finnagi.thoughts), str(finnagi.working_memory)))

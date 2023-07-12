@@ -75,6 +75,7 @@ class FinnAGI(BaseModel):
     current_goal: Optional[Any]
     emotions: Optional[Any]
     messages: Optional[Any]
+    chat: Optional[Any]
     last_task: Optional[Any]
     class Config:
         arbitrary_types_allowed = True
@@ -128,137 +129,89 @@ class FinnAGI(BaseModel):
         self.agent_name = "BuddyAGI"
         self.agent_goal = "To complete tasks for Peyton."
         self.agent_creator = "Peyton"
-    def connect_to_me_nosave(self):
-        self.working_memory.clear()  # Reset working memory
-        self.db.upsert_user("myself")  # Upsert user "myself"
-        self.emotion.reset()  # Reset emotional state
-        self.thought_manager.initial_thought()  # Initial thought
-        self.thought_manager.stack_first_thought()  # Stack first thought
-        self.volition(self.agent_goal)  # Volition
-    def volition(self, goal=None):
-        print("Volition")
-        while True:
-            print("send a task to begin")
-            self.check_messages()
-            if len(self.messages) > 0:
-                while not self.thought_stack.is_empty():
-                    message = self.messages[-2:].copy()
-                    thought = self.thought_stack.pop()
-                    processed_thought = self.gpt.process_thought(thought, message, goal)  # Assuming you have a method to process thought
-                    self.thoughts.append(processed_thought)
-                    self.working_memory.append(processed_thought)
-                    self.current_goal = self.goal_manager.decide_goal(processed_thought)
-                break
+        self.chat = {}
     def run(self):
-            task_attempts = {}
+        task_attempts = {}
+        self.check_messages()
+        if len(self.messages) > 0:
             message = self.messages[-2:].copy()
             self.messages.clear()
-            print("Working memory: ", self.working_memory)
-            recent_thoughts = list(self.working_memory)[-3:]
-            memory = str(recent_thoughts)
-            print("generate new task")
+            qa = self.task_manager.clarify(message)
+            full_request = self.send_message(qa)
             with self.ui.loading("Generate Task Plan..."):
                 self.task_manager.generate_task_plan(
-                    agent_name=self.agent_name,
-                    message=message,
-                    thought=memory,
-                    last_task=self.last_task,
+                    message=full_request 
                 )
             self.ui.notify(title="ALL TASKS",
-                        message=self.task_manager.get_incomplete_tasks_string(),
-                        title_color="BLUE")
-            while True:
-                if self.task_manager.get_current_task_string() is None:
-                    self.volition(self.agent_goal)
-                else:
-                    self.ui.notify(title="ALL TASKS",
-                                message=self.task_manager.get_incomplete_tasks_string(),
-                                title_color="BLUE")
-                    while True:
-                        #current_task = self.task_manager.get_current_task_string()
-                        current_task = self.task_manager.get_current_task_string()
-                        if current_task is None:
-                            self.volition(self.agent_goal)
-                        else:
-                            self.ui.notify(title="CURRENT TASK",
-                                        message=current_task,
-                                        title_color="BLUE")
-                            self.thought_stack.push(recent_thoughts[-1:])
-                        #ReAct: Reasoning
-                        if task_attempts.get(current_task, 0) > 3:
-                            current_task = self.task_manager.generate_task_plan(
-                                agent_name=self.agent_name,
-                                message=message,
-                                thought=memory,
-                                last_task=self.last_task)
-                            self.ui.notify(title="MODIFIED TASK", message=current_task, title_color="BLUE")
-                        with self.ui.loading("Thinking..."):
-                            try:
-                                reasoning_result = self._reason()
-                                if reasoning_result is not None:
-                                    thoughts = reasoning_result["thoughts"]
-                                    action = reasoning_result["action"]
-                                    tool_name = action["tool_name"]
-                                    args = action["args"]
-                                else:
-                                    self.volition(self.agent_goal)
-                            except Exception as e:
-                                raise Exception("An error occurred: " + str(e) + "\n" + traceback.format_exc())
-                        self.ui.notify(title="TASK", message=thoughts.get("task", "No task found"))
-                        self.ui.notify(title="IDEA", message=thoughts.get("idea", "No idea found"))
-                        self.ui.notify(title="REASONING", message=thoughts.get("reasoning", "No reasoning found"))
-                        self.ui.notify(title="CRITICISM", message=thoughts.get("criticism", "No criticism found"))
-                        self.ui.notify(title="THOUGHT", message=thoughts.get("summary", "No summary found"))
-                        self.ui.notify(title="NEXT ACTION", message=action)
-                        # Task Complete
-                        if tool_name == "task_complete":
-                            action_result = args["result"]
-                            self._task_complete(action_result)
-                            # save agent data
-                            with self.ui.loading("Save agent data..."):
-                                self.save_agent()
-                            self.working_memory.append(str(action_result))
-                            self.thought_stack.append(str(action_result))
-                            self.volition()
-                        # Action with tools
-                        else:
-                            # Ask for permission to run the action
-                            #user_permission = self.ui.get_binary_user_input(
-                            #    "Do you want to continue?")
-                            #if not user_permission:
-                            #    action_result = "User Denied to run Action"
-                            #    self.ui.notify(title="USER INPUT", message=action_result)
-                            #else:
-                            try:
-                                action_result = self._act(tool_name, args)
-                            except Exception as e:
-                                raise e
-                            self.ui.notify(title="ACTION RESULT", message=action_result)
-                            action_result_string = str(action_result)
-                        episode = Episode(
-                            thoughts=thoughts,
-                            action=action,
-                            result=action_result_string,
-                            summary=action_result_string
-                        )
-                        # Reflect on action
-                        #reflectedthought = self.action_manager.reflect_on_action(action, action_result)
-                        # Store memory
-                        self.memory_manager.store_memory(self.working_memory, thoughts, action, episode.summary)
-                        summary = self.episodic_memory.summarize_and_memorize_episode(episode)
-                        self.ui.notify(title="MEMORIZE NEW EPISODE",
-                                    message=summary, title_color="blue")
-                        episode_str = str(episode)
-                        entities = self.semantic_memory.extract_entity(episode_str)
-                        self.ui.notify(title="MEMORIZE NEW KNOWLEDGE",
-                                    message=entities, title_color="blue")
-                        #self.save_state()
-                        #self._task_complete(action_result)]
-                        self.working_memory.append(action_result_string)
-                        self.last_task.append(action_result)
-                        time.sleep(1)
-                        self.save_agent()
-                        task_attempts[current_task] = task_attempts.get(current_task, 0)+1
+                            message=self.task_manager.get_incomplete_tasks_string(),
+                            title_color="BLUE")                
+        while True:
+            current_task = self.task_manager.get_current_task_string()
+            if current_task is None:
+                break
+            else:
+                self.ui.notify(title="CURRENT TASK",
+                            message=current_task,
+                            title_color="BLUE")
+            #ReAct: Reasoning
+            if task_attempts.get(current_task, 0) > 3:
+                current_task = self.task_manager.modify_current_task(thought=full_request)
+                self.ui.notify(title="MODIFIED TASK", message=current_task, title_color="BLUE")
+            with self.ui.loading("Thinking..."):
+                try:
+                    reasoning_result = self._reason()
+                    if reasoning_result is not None:
+                        thoughts = reasoning_result["thoughts"]
+                        action = reasoning_result["action"]
+                        tool_name = action["tool_name"]
+                        args = action["args"]
+                    else:
+                        print("No reasoning result found")
+                except Exception as e:
+                    raise Exception("An error occurred: " + str(e) + "\n" + traceback.format_exc())
+            self.ui.notify(title="TASK", message=thoughts.get("task", "No task found"))
+            self.ui.notify(title="IDEA", message=thoughts.get("idea", "No idea found"))
+            self.ui.notify(title="REASONING", message=thoughts.get("reasoning", "No reasoning found"))
+            self.ui.notify(title="CRITICISM", message=thoughts.get("criticism", "No criticism found"))
+            self.ui.notify(title="THOUGHT", message=thoughts.get("summary", "No summary found"))
+            self.ui.notify(title="NEXT ACTION", message=action)
+            # Task Complete
+            if tool_name == "task_complete":
+                action_result = args["result"]
+                self._task_complete(action_result)
+                # save agent data
+                with self.ui.loading("Save agent data..."):
+                    self.save_agent()
+                self.working_memory.append(str(action_result))
+            # Action with tools
+            else:
+                try:
+                    action_result = self._act(tool_name, args)
+                except Exception as e:
+                    raise e
+                self.ui.notify(title="ACTION RESULT", message=action_result)
+                action_result_string = str(action_result)
+            episode = Episode(
+                thoughts=thoughts,
+                action=action,
+                result=action_result_string,
+                summary=action_result_string
+            )
+            # Store memory
+            self.memory_manager.store_memory(self.working_memory, thoughts, action, episode.summary)
+            summary = self.episodic_memory.summarize_and_memorize_episode(episode)
+            self.ui.notify(title="MEMORIZE NEW EPISODE",
+                        message=summary, title_color="blue")
+            episode_str = str(episode)
+            entities = self.semantic_memory.extract_entity(episode_str)
+            self.ui.notify(title="MEMORIZE NEW KNOWLEDGE",
+                        message=entities, title_color="blue")
+            self.working_memory.append(action_result_string)
+            #self.last_task.append(action_result)
+            self.task_manager.eval_action(action_result_string, message)
+            time.sleep(1)
+            self.save_agent()
+            task_attempts[current_task] = task_attempts.get(current_task, 0)+1
                         #self.volition(self.agent_name, self.agent_goal)
                     # Perform the selected action
                     #self.action_manager.perform_action(action, thought)
@@ -368,6 +321,9 @@ class FinnAGI(BaseModel):
                             if self.messages is not None:
                                 prompt+= ''.join(self.messages[-2:])
                                 self.messages.clear()
+                            if self.last_task is not None:
+                                prompt += ' '.join(map(str, self.last_task[-1:]))
+                                self.last_task.clear()
                             results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": schematemplate},{"role": "user", "content": prompt}])
                             result = results['choices'][0]['message']['content']
                             #results_dict = json.loads(result)
@@ -434,6 +390,21 @@ class FinnAGI(BaseModel):
         else:
             print("no new messages")
         return
+    def send_message(self, message):
+        messages =  [message]
+        print(f"sending message", message)
+        response = requests.post("http://localhost:5000/creatormessages", data=message)
+        if response.status_code == 200:
+            while True:
+                response = requests.get("http://localhost:5000/buddymessages")
+                if response.status_code == 200:
+                    self.messages.append(response.text)
+                else:
+                    print("no new messages")
+                    time.sleep(2)
+        return messages
+
+
     def save_agent(self) -> None:
         episodic_memory_dir = f"{self.dir}/episodic_memory"
         semantic_memory_dir = f"{self.dir}/semantic_memory"

@@ -58,9 +58,9 @@ class toolmanagement:
             print(f"No tools found for class '{class_name}'")
             return f"No tools found for class '{class_name}'"
         return tools
-
     def list_tool_classes(self, args=None):
-        classes = [tool['class'] for tool in self.tools if tool['class'] not in classes]
+        classes = [tool['class'] for tool in self.tools]
+        classes = list(dict.fromkeys(classes))  # remove duplicates
         return classes
 
     def create_new_class(self, genre):

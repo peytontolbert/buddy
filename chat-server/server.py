@@ -177,7 +177,7 @@ def finndms():
 def buddymessagess():
     # Check if there are no messages
     if len(buddymessages) == 0:
-        return jsonify({'message': 'No messages'}), 404
+        return 404
 
     # Return all messages
     all_messages = buddymessages.copy()  # Copy the messages
