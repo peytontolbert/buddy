@@ -20,7 +20,6 @@ def save_messages():
             'messages': messages,
             'chatbox': chatbox,
             'unreaddm': unreaddm,
-            'finndm': finndm,
             'buddydm': buddydm,
             'creatordm': creatordm,
             'oldmessages': oldmessages
@@ -34,24 +33,10 @@ def save_messages():
 
 # Start saving messages in the background
 save_messages()
+@app.route('/')
+def home():
+    return render_template('chat.html')
 
-@app.route("/messagetofinn", methods=["POST"])
-def messagetofinn():
-    # Get message from POST request
-    data = request.get_json()
-    user = data.get('user')
-    message = data.get('message')
-    print(user, message)
-
-    # Check if the message is empty
-    if not message:
-        return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
-
-    # Add the message to the messages list
-    finndm.append({'user': user, 'message': message})
-    unreaddm.append({'user': user, 'message': message})
-
-    return jsonify({'status': 'success', 'message': 'Message received'}), 200
 
 @app.route("/messagetobuddy", methods=["POST"])
 def messagetobuddy2():
@@ -177,7 +162,7 @@ def finndms():
 def buddymessagess():
     # Check if there are no messages
     if len(buddymessages) == 0:
-        return 404
+        return jsonify({'error': 'No messages'}), 404
 
     # Return all messages
     all_messages = buddymessages.copy()  # Copy the messages

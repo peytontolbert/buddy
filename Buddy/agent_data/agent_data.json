@@ -1,1 +1,1 @@
-{"name": "BuddyAGI", "goal": "To complete tasks for Peyton.", "episodic_memory": "./agent_data/episodic_memory", "semantic_memory": "./agent_data/semantic_memory"}
+{"name": "BuddyAGI", "episodic_memory": "./agent_data/episodic_memory", "semantic_memory": "./agent_data/semantic_memory"}

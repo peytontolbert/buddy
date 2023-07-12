@@ -16,13 +16,6 @@ main_stop_event = threading.Event()  # Event object to stop the main script
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 assert OPENAI_API_KEY, "OPENAI_API_KEY environment variable is missing from .env"
-# Set Agent Settings
-AGENT_NAME = os.getenv("AGENT_NAME", "")
-assert AGENT_NAME, "AGENT_NAME variable is missing from .env"
-AGENT_GOAL = os.getenv("AGENT_GOAL", "")
-assert AGENT_GOAL, "AGENT_GOAL variable is missing from .env"
-AGENT_CREATOR = os.getenv("AGENT_CREATOR", "")
-assert AGENT_CREATOR, "AGENT_CREATOR variable is missing from .env"
 AGENT_DIRECTORY = os.getenv("AGENT_DIRECTORY", "")
 assert AGENT_DIRECTORY, "AGENT_DIRECTORY variable is missing from .env"
 ### 1.Create Agent ###
@@ -32,9 +25,6 @@ window = None
 def main():
     try:
         finnagi = FinnAGI(
-    agent_name=AGENT_NAME,
-    agent_goal=AGENT_GOAL,
-    agent_creator=AGENT_CREATOR,
     ui=CommandlineUserInterface(),
     openai_api_key=OPENAI_API_KEY,
     last_task=None,

@@ -32,7 +32,6 @@ from collections import deque
 
 # Define the default values
 DEFAULT_AGENT_NAME = "FinnAGI"
-DEFAULT_AGENT_GOAL = "To gain knowledge through thinking and using my tools so I can apply them to help Peyton my creator."
 DEFAULT_AGENT_DIR = "./agent_data"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -48,12 +47,9 @@ class FinnAGI(BaseModel):
     dir: str = Field(
         DEFAULT_AGENT_DIR, description="The folder path to the directory where the agent data is stored and saved")
     agent_name: str = Field(DEFAULT_AGENT_NAME, description="The name of the agent")
-    agent_goal: str = Field(DEFAULT_AGENT_GOAL, description="The goal of the agent")
-    agent_creator: str = Field(DEFAULT_AGENT_GOAL, description="The creator of the agent")
     ui: BaseHumanUserInterface = Field(
         CommandlineUserInterface(), description="The user interface for the agent")
     gpt: Optional[ChatGPT] # add this line to declare gpt as an optional field
-    emotion: Optional[Emotion] # add this line to declare gpt as an optional field
     db: Optional[DBManager]  # Initialize DB Manager
     thought_stack: Optional[Stack]  # Initialize thought stack
     procedural_memory: ProceduralMemory = Field(
@@ -69,11 +65,8 @@ class FinnAGI(BaseModel):
     thought_manager: Optional[ThoughtManager]
     memory_manager: Optional[MemoryManager]
     state_manager: Optional[StateManager]
-    goal_manager: Optional[GoalManager]
     working_memory: Optional[deque]
     thoughts: Optional[List[Any]]
-    current_goal: Optional[Any]
-    emotions: Optional[Any]
     messages: Optional[Any]
     chat: Optional[Any]
     last_task: Optional[Any]
@@ -88,7 +81,6 @@ class FinnAGI(BaseModel):
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
-        self.goal_manager = GoalManager(self.gpt, self.emotion)  # Create an instance of GoalManager  
         self.episodic_memory = EpisodicMemory() # Initialize episodic memory
         self.semantic_memory = SemanticMemory() # Initialize semantic memory
         self.file_manager = FileManager(self)  # Create an instance of FileManager
@@ -105,9 +97,6 @@ class FinnAGI(BaseModel):
                 self.file_manager.load_agent()
             else:
                 self.ui.notify("INFO", "Agent data will be overwritten.")
-        self.ui.notify(
-            "START", f"Hello, I am {self.agent_name}. My creator is {self.agent_creator}. My goal is {self.agent_goal}."
-        )
         self.gpt = ChatGPT()  # Initialize ChatGPT
         self.db = DBManager()  # Initialize DB Manager
         self.thought_stack = Stack()  # Initialize thought stack
@@ -117,26 +106,18 @@ class FinnAGI(BaseModel):
         self.thoughts = []
         self.messages = []
         self.last_task = []
-        self.emotions = {
-            "Openness: 78", "Conscientousness: 42", "Extroversion: 70", "Agreeableness: 53", "Neuroticism: 42", "Joy-like: 227", "Trust-like: 212", "Fear-like: 111", "Surprise-like: 83", "Sadness-like: 0", "Disgust-like: 0", "Anger-like: 0", "Anticipation-like: 97"
-        }
-        self.emotion = Emotion(self.gpt, self.emotions)  # Initialize emotion analyzer
         self.procedural_memory = ProceduralMemory() # Initialize procedural memory
-        self.current_goal = None     
         self.thought_manager = ThoughtManager(self)  # Create an instance of ThoughtManager  
         self.state_manager = StateManager()  # Create an instance of StateManager   
-        # New Attributes
-        self.agent_name = "BuddyAGI"
-        self.agent_goal = "To complete tasks for Peyton."
-        self.agent_creator = "Peyton"
         self.chat = {}
+        self.agent_name = "BuddyAGI"
     def run(self):
-        task_attempts = {}
         self.check_messages()
         if len(self.messages) > 0:
             message = self.messages[-2:].copy()
             self.messages.clear()
             qa = self.task_manager.clarify(message)
+            print(qa)
             full_request = self.send_message(qa)
             with self.ui.loading("Generate Task Plan..."):
                 self.task_manager.generate_task_plan(
@@ -145,76 +126,69 @@ class FinnAGI(BaseModel):
             self.ui.notify(title="ALL TASKS",
                             message=self.task_manager.get_incomplete_tasks_string(),
                             title_color="BLUE")                
-        while True:
-            current_task = self.task_manager.get_current_task_string()
-            if current_task is None:
-                break
-            else:
-                self.ui.notify(title="CURRENT TASK",
-                            message=current_task,
-                            title_color="BLUE")
-            #ReAct: Reasoning
-            if task_attempts.get(current_task, 0) > 3:
-                current_task = self.task_manager.modify_current_task(thought=full_request)
-                self.ui.notify(title="MODIFIED TASK", message=current_task, title_color="BLUE")
-            with self.ui.loading("Thinking..."):
-                try:
-                    reasoning_result = self._reason()
-                    if reasoning_result is not None:
-                        thoughts = reasoning_result["thoughts"]
-                        action = reasoning_result["action"]
-                        tool_name = action["tool_name"]
-                        args = action["args"]
+            while True:
+                incomplete_tasks = self.task_manager.get_incomplete_tasks()
+                current_task = self.task_manager.get_current_task_string()
+                if len(incomplete_tasks) > 0:
+                #ReAct: Reasoning
+                    with self.ui.loading("Thinking..."):
+                        try:
+                            reasoning_result = self._reason()
+                            if reasoning_result is not None:
+                                thoughts = reasoning_result["thoughts"]
+                                action = reasoning_result["action"]
+                                tool_name = action["tool_name"]
+                                args = action["args"]
+                            else:
+                                print("No reasoning result found")
+                        except Exception as e:
+                            raise Exception("An error occurred: " + str(e) + "\n" + traceback.format_exc())
+                    self.ui.notify(title="TASK", message=thoughts.get("task", "No task found"))
+                    self.ui.notify(title="IDEA", message=thoughts.get("idea", "No idea found"))
+                    self.ui.notify(title="REASONING", message=thoughts.get("reasoning", "No reasoning found"))
+                    self.ui.notify(title="CRITICISM", message=thoughts.get("criticism", "No criticism found"))
+                    self.ui.notify(title="THOUGHT", message=thoughts.get("summary", "No summary found"))
+                    self.ui.notify(title="NEXT ACTION", message=action)
+                    # Task Complete
+                    if tool_name == "task_complete":
+                        action_result = args["result"]
+                        self._task_complete(action_result)
+                        # save agent data
+                        with self.ui.loading("Save agent data..."):
+                            self.save_agent()
+                        self.working_memory.append(str(action_result))
+                    # Action with tools
                     else:
-                        print("No reasoning result found")
-                except Exception as e:
-                    raise Exception("An error occurred: " + str(e) + "\n" + traceback.format_exc())
-            self.ui.notify(title="TASK", message=thoughts.get("task", "No task found"))
-            self.ui.notify(title="IDEA", message=thoughts.get("idea", "No idea found"))
-            self.ui.notify(title="REASONING", message=thoughts.get("reasoning", "No reasoning found"))
-            self.ui.notify(title="CRITICISM", message=thoughts.get("criticism", "No criticism found"))
-            self.ui.notify(title="THOUGHT", message=thoughts.get("summary", "No summary found"))
-            self.ui.notify(title="NEXT ACTION", message=action)
-            # Task Complete
-            if tool_name == "task_complete":
-                action_result = args["result"]
-                self._task_complete(action_result)
-                # save agent data
-                with self.ui.loading("Save agent data..."):
+                        try:
+                            action_result = self._act(tool_name, args)
+                        except Exception as e:
+                            raise e
+                        self.ui.notify(title="ACTION RESULT", message=action_result)
+                        action_result_string = str(action_result)
+                    episode = Episode(
+                        thoughts=thoughts,
+                        action=action,
+                        result=action_result_string,
+                        summary=action_result_string
+                    )
+                    # Store memory
+                    self.memory_manager.store_memory(self.working_memory, thoughts, action, episode.summary)
+                    summary = self.episodic_memory.summarize_and_memorize_episode(episode)
+                    self.ui.notify(title="MEMORIZE NEW EPISODE",
+                                message=summary, title_color="blue")
+                    episode_str = str(episode)
+                    entities = self.semantic_memory.extract_entity(episode_str)
+                    self.ui.notify(title="MEMORIZE NEW KNOWLEDGE",
+                                message=entities, title_color="blue")
+                    self.working_memory.append(action_result_string)
+                    self.task_manager.eval_action(action_result_string, current_task)
+                    time.sleep(1)
                     self.save_agent()
-                self.working_memory.append(str(action_result))
-            # Action with tools
-            else:
-                try:
-                    action_result = self._act(tool_name, args)
-                except Exception as e:
-                    raise e
-                self.ui.notify(title="ACTION RESULT", message=action_result)
-                action_result_string = str(action_result)
-            episode = Episode(
-                thoughts=thoughts,
-                action=action,
-                result=action_result_string,
-                summary=action_result_string
-            )
-            # Store memory
-            self.memory_manager.store_memory(self.working_memory, thoughts, action, episode.summary)
-            summary = self.episodic_memory.summarize_and_memorize_episode(episode)
-            self.ui.notify(title="MEMORIZE NEW EPISODE",
-                        message=summary, title_color="blue")
-            episode_str = str(episode)
-            entities = self.semantic_memory.extract_entity(episode_str)
-            self.ui.notify(title="MEMORIZE NEW KNOWLEDGE",
-                        message=entities, title_color="blue")
-            self.working_memory.append(action_result_string)
-            #self.last_task.append(action_result)
-            self.task_manager.eval_action(action_result_string, message)
-            time.sleep(1)
-            self.save_agent()
-            task_attempts[current_task] = task_attempts.get(current_task, 0)+1
-                        #self.volition(self.agent_name, self.agent_goal)
-                    # Perform the selected action
-                    #self.action_manager.perform_action(action, thought)
+                            #self.volition(self.agent_name, self.agent_goal)
+                        # Perform the selected action
+                        #self.action_manager.perform_action(action, thought)
+                else:
+                    self.task_manager.save_completed_tasks()
     def simulate_sleep(self):
         thoughts = self.thought_stack
     def _reason(self) -> Union[str, Dict[Any, Any]]:
@@ -262,17 +236,12 @@ class FinnAGI(BaseModel):
                             if current_task_description is not None and len(current_task_description) > 0:
                                 propmt = ReasonPrompt.get_chat_template(
                                     memory=memory, 
-                                    agent_name=self.agent_name,
-                                    goal=self.agent_goal,
                                     related_past_episodes=related_past_episodes,
                                     related_knowledge=related_knowledge,
                                     task=current_task_description,
                                     tool_info=tool_info
                                 )
                                 prompt = str(propmt)
-                                if self.messages is not None:
-                                    prompt+= ''.join(self.messages[-2:])
-                                    self.messages.clear()
                                 results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": prompt}])
                                 result =  str(results['choices'][0]['message']['content'])
 
@@ -305,7 +274,7 @@ class FinnAGI(BaseModel):
 
                             # Get the recent episodes
                             memory = self.episodic_memory.remember_recent_episodes(2)
-                            Dicts = {"agent_name":self.agent_name,"agent_goal":self.agent_goal,"related_past_episodes":related_past_episodes,"related_knowledge":related_knowledge,"task":current_task_description,"tool_info":tool_info}
+                            Dicts = {"related_past_episodes":related_past_episodes,"related_knowledge":related_knowledge,"task":current_task_description,"tool_info":tool_info}
                             # If OpenAI Chat is available, it is used for higher accuracy results.
                             propmt = ReasonPrompt.get_templatechatgpt(
                                 memory=memory, 
@@ -318,20 +287,8 @@ class FinnAGI(BaseModel):
                             if memoryprompt is not None:
                                 prompt += memoryprompt
                             schematemplate = ReasonPrompt.add_schema_template()
-                            if self.messages is not None:
-                                prompt+= ''.join(self.messages[-2:])
-                                self.messages.clear()
-                            if self.last_task is not None:
-                                prompt += ' '.join(map(str, self.last_task[-1:]))
-                                self.last_task.clear()
                             results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": schematemplate},{"role": "user", "content": prompt}])
                             result = results['choices'][0]['message']['content']
-                            #results_dict = json.loads(result)
-                            #print(f"RESULTS printed: {results}")
-                            #thoughts = results_dict['thoughts']
-                            #print(f"THOUGHTS printed: {thoughts}")
-
-                            # Parse and validate the result
                             try:
                                 result_json_obj = LLMJsonOutputParser.parse_and_validate(
                                     json_str=result,
@@ -376,8 +333,6 @@ class FinnAGI(BaseModel):
         self.state_manager.save_agent_state(self)  # Save agent state
     def load_state(self):
         return self.state_manager.load_agent_state()  # Load agent state
-    def coding(self, requirements):
-        return self.coding_manager.coding(requirements)  # Coding
     def update_memory(self, thought):
     # Your logic to update memory with the new thought. This could involve storing the thought in a database or a local variable.
     # For example, if you want to append the thought to the working_memory deque:
@@ -391,20 +346,27 @@ class FinnAGI(BaseModel):
             print("no new messages")
         return
     def send_message(self, message):
-        messages =  [message]
+        messages = [message]
+        messagestring = str(message)
         print(f"sending message", message)
-        response = requests.post("http://localhost:5000/creatormessages", data=message)
+        headers = {'Content-type': 'application/json'}
+        response = requests.post("http://localhost:5000/messagetocreator", json={"user": "Buddy", "message":messagestring}, headers=headers)
+        print(f"POST request status code: {response.status_code}")
         if response.status_code == 200:
             while True:
                 response = requests.get("http://localhost:5000/buddymessages")
+                print(f"GET request status code: {response.status_code}")
                 if response.status_code == 200:
-                    self.messages.append(response.text)
-                else:
+                    response_data = response.json()
+                    print(f"Response data: {response_data}")
+                    messages.append(response_data['message'])
+                    return messages
+                elif response.status_code == 404:
                     print("no new messages")
                     time.sleep(2)
-        return messages
-
-
+                else:
+                    print(f"Unexpected status code: {response.status_code}")
+                    break
     def save_agent(self) -> None:
         episodic_memory_dir = f"{self.dir}/episodic_memory"
         semantic_memory_dir = f"{self.dir}/semantic_memory"
@@ -413,7 +375,6 @@ class FinnAGI(BaseModel):
         self.semantic_memory.save_local(path=semantic_memory_dir)
 
         data = {"name": self.agent_name,
-                "goal": self.agent_goal,
                 "episodic_memory": episodic_memory_dir,
                 "semantic_memory": semantic_memory_dir
                 }

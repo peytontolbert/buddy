@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Chatbox</title>
+    </head>
+    <body>
+        <h1>Chatbox</h1>
+        <div id="chatbox">
+            <!-- Chat messages will go here -->
+        </div>
+        <form id="chat-form">
+            <input type="text" id="message" placeholder="Type a message">
+            <button type="submit">Send</button>
+        </form>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="{{ url_for('static', filename='chat.js') }}"></script>
+    </body>
+</html>

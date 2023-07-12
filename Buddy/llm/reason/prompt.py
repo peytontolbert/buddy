@@ -23,10 +23,9 @@ from langchain.schema import (
 
 BASE_TEMPLATE = """
 
-You are {agent_name}
-Your decisions are made to perform real world actions to complete a task. 
-You are equipped with a set of tools and memory of past events.
+Your decisions are made to make independent actions as an autonomous cognitive agent. 
 Play to your strengths as an LLM and pursue simple strategies with no legal complications.
+
 
 [PERFORMANCE EVALUATION]
 1. Continuously review and analyze your actions to ensure you are performing to the best of your abilities.
@@ -95,12 +94,12 @@ Determine which next command to use, and respond using the format specified abov
 def get_templatechatgpt(memory: List[Episode] = None, Dicts = {}):
         # Ensure necessary keys are in Dicts
     print("required key check on Dicts")
-    required_keys = ["agent_name", "agent_goal", "related_knowledge", "related_past_episodes", "task", "tool_info"]
+    required_keys = ["related_knowledge", "related_past_episodes", "task", "tool_info"]
     for key in required_keys:
         if key not in Dicts:
             raise KeyError(f"The required key {key} was not found in Dicts.")
 
-    template = BASE_TEMPLATE.format(agent_name=Dicts["agent_name"], goal=Dicts["agent_goal"], related_knowledge=Dicts["related_knowledge"], related_past_episodes=Dicts["related_past_episodes"], task=Dicts["task"], tool_info=Dicts["tool_info"])
+    template = BASE_TEMPLATE.format(related_knowledge=Dicts["related_knowledge"], related_past_episodes=Dicts["related_past_episodes"], task=Dicts["task"], tool_info=Dicts["tool_info"])
     return template
 
 def add_schema_template():

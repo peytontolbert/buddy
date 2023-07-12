@@ -95,35 +95,24 @@ class TaskManager(BaseModel):
         else:
             return self._task_to_string(task)
 
-    def eval_action(self, action: str, message: None) -> bool:
+    def eval_action(self, action_result_string: str, current_task: None) -> bool:
         """Evaluate an action."""
-        prompt = """You are an intelligent agent. You should evaluate and modify a task list based on the following action:
+        prompt = """You are an intelligent agent. You should evaluate and decide if the recent action completed the task or not.:
         [RECENT ACTION]
         {action}
-        
-        [MESSAGE]
-        {message}
 
-        [TASK]
-        {tasks}
+        [CURRENT TASK]
+        {task}
 
         [YOUR MISSION]
-        Based on the recent action, response with a new task list to satisfy the objective.
-        - Tasks should be simple enough to solve with a single action.
-        - Create up to 5 tasks at a time.
-
+        Based on the recent action, your job is to respond whether the current task has been completed or not.
         [RESPONSE FORMAT]
-        Return the tasks as a list of string.
-        - Enclose each task in double quotation marks.
-        - Separate tasks with Tabs.
-        - Reply in first-person.
-        - Use [] only at the beginning and end
-
-        ["Task 1 that I should perform"\t"Task 2 that I should perform",\t ...]
+        Return "Yes" or "No" as a string. The question is has the current task been complete?
 
         [RESPONSE]
         """
-        chat_input = prompt.format(action=action, tasks=self.get_incomplete_tasks_string(), message=message)
+        chat_input = prompt.format(action=action_result_string, task=current_task)
+        print(chat_input)
         retries, delay = 20, 5     
         for i in range(retries):
             try:
@@ -131,27 +120,21 @@ class TaskManager(BaseModel):
                 results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": chat_input}])
                 result =  str(results['choices'][0]['message']['content'])
                 print(result)
+
+                if result.lower() == "yes":
+                    self.complete_current_task(result=action_result_string)
+                elif result.lower() == "no":
+                    return
+                else:
+                    if i<retries-1:
+                        time.sleep(delay)
+                    else:
+                        raise ValueError("Invalid response from OpenAI API")
             except openai.error.ServiceUnavailableError:
                 if i < retries - 1:
                     time.sleep(delay)
                 else:
                     raise
-
-
-            # Parse and validate the result
-            try:
-                result_list = LLMListOutputParser.parse(result, separeted_string="\t")
-            except Exception as e:
-                raise Exception("Error: " + str(e))
-
-            # Add tasks with a serial number
-            for i, e in enumerate(result_list, start=1):
-                id = int(i)
-                description = e
-                self.tasks.clear
-                self.tasks.append(Task(id=id, description=description))
-
-            self
 
     def complete_task(self, id: int, result: str) -> None:
         """Complete a task by Task id."""
@@ -237,17 +220,20 @@ class TaskManager(BaseModel):
     
     def clarify (self, message:str ) -> str:
         prompt = """You will read a instruction for a task. You will not carry out those instructions.
-Specifically you will first summarise a list of areas that need clarification.
-Then you will pick one clarifying question, and wait for an answer from the user.
+Specifically create a list of areas that need clarification. For example, if the instruction is "Code me an html server", you might ask "what programming language should I use?".
 [EXAMPLE-MESSAGE]
 Code me an html server
 
 Reply in JSON format, for example:
 [RESPONSE]
-{{"task": "code an html server", "questions: ["what programming language should I use?", "should I use any libraries?", "any other features to add to the server?"]}}
+{{"task": "code an html server", "questions: ["what programming language should I use?"]}}
+
+Now lets try to answer below:
+
 
 [MESSAGE]
 {message}
+[RESPONSE]
 """
         retries, delay = 20, 5
         for i in range(retries):
@@ -260,4 +246,23 @@ Reply in JSON format, for example:
                 else:
                     raise  # re-raise the last exception if all retries fail
 
+    def save_completed_tasks(self) -> None:
+        """Save the list of completed tasks."""
+        try:
+            with open("completed_tasks.json", "r") as f:
+                # Load existing tasks from the file
+                existing_tasks = json.load(f)
+        except FileNotFoundError:
+            # If the file doesn't exist, initialize with an empty list
+            existing_tasks = []
+
+        # Add the new completed tasks to the existing tasks
+        existing_tasks.extend(self.tasks)
+
+        with open("completed_tasks.json", "w") as f:
+            # Save the updated list of completed tasks
+            json.dump(existing_tasks, f, indent=4)
+
+        # Clear the tasks list
+        self.tasks.clear()
 
