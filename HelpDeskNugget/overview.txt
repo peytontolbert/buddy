@@ -1,0 +1,3 @@
+Webserver IT ticket support system mixed with personal agent.
+Use case for big business
+Class HelpdeskAgent functions: add_to_conversation(appendmessage), generate_prompt(The following conversation is with a helpdesk AI. then add messages in conversation history after), escalate issue(logic to escalate issue such as sending email to human operator), answer_question(addmessagetoconvo, addprompt,getresponse)

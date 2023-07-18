@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat with Nugget: Ticket Support</title>
+    <style>
+        #chatBox {
+            height: 400px;
+            border: 1px solid #dddddd;
+            padding: 10px;
+            overflow-y: scroll;
+        }
+        #userInput {
+            width: 100%;
+            box-sizing: border-box;
+        }
+    </style>    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="index.js"></script>
+</head>
+<body>
+    <div id="usernameContainer">
+        <input type="text" id="usernameInput" placeholder="Enter your username..." />
+        <button id="usernameButton">Set Username</button>
+    </div>
+    <div id="chatBox"></div>
+    <input type="text" id="userInput" placeholder="Type your message here..." disabled />
+    <button id="sendButton" disabled>Send</button>
+</body>
+</html>

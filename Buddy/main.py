@@ -10,10 +10,7 @@ import PySimpleGUI as sg
 import importlib
 from dotenv import load_dotenv
 load_dotenv()
-
 main_stop_event = threading.Event()  # Event object to stop the main script
-
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 assert OPENAI_API_KEY, "OPENAI_API_KEY environment variable is missing from .env"
 AGENT_DIRECTORY = os.getenv("AGENT_DIRECTORY", "")
@@ -27,7 +24,6 @@ def main():
         finnagi = FinnAGI(
     ui=CommandlineUserInterface(),
     openai_api_key=OPENAI_API_KEY,
-    last_task=None,
     dir=dir,
 )
         tools = []

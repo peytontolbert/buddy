@@ -11,6 +11,7 @@ finndm = []
 buddydm = []
 buddymessages = []
 creatordm = []
+nuggetchatbox = []
 oldmessages = []
 # Function to save messages to a JSON file
 def save_messages():
@@ -19,6 +20,7 @@ def save_messages():
         data = {
             'messages': messages,
             'chatbox': chatbox,
+            'nuggetchatbox': nuggetchatbox,
             'unreaddm': unreaddm,
             'buddydm': buddydm,
             'creatordm': creatordm,
@@ -35,8 +37,30 @@ def save_messages():
 save_messages()
 @app.route('/')
 def home():
-    return render_template('chat.html')
+    return render_template('/index.html')
 
+@app.route("/nuggetchat", methods=["POST"])
+def nuggetchat():
+    data = request.get_json()
+    user = data.get('user')
+    message = data.get('message')
+    print(user)
+    print(message)
+    if not message:
+        return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
+    
+    nuggetchatbox.append({'user': user, 'message': message})
+    return jsonify({'status': 'success', 'message': 'Message received'}), 200
+
+@app.route("/nuggetchat", methods=["GET"])
+def nuggetgetchat():
+    # Check if there are no messages
+    if len(nuggetchatbox) == 0:
+        return jsonify({'message': 'No messages'}), 404
+    message = nuggetchatbox.copy()
+    nuggetchatbox.clear()
+    # Return all messages
+    return jsonify({'messages': message}), 200
 
 @app.route("/messagetobuddy", methods=["POST"])
 def messagetobuddy2():
