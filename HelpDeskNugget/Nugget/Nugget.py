@@ -1,14 +1,13 @@
 import requests
-from factory.factory import AgentFactory
+from factory.factory import Factory
 
 class NuggetAGI:
     def __init__(self):
         self.messagequeue = []
         self.users = []
         self.standard_prompt = """This is a conversation between an AI assistant and a user."""
-        self.conversationhistory = []
-        self.factory = AgentFactory()
-        pass
+        self.conversationhistory = {}
+        self.factory = Factory()
 
     def run(self):
         print("Checking messages...")
@@ -20,12 +19,21 @@ class NuggetAGI:
 
     def handle_message(self, message):
         user_id = message['user']
-        if message['user'] not in self.users:
+        if user_id not in self.users:
             print(f"New user: {message['user']}")
             self.users.append(message)
             self.start_conversation(message)
             print("New conversation started")
-        print(f"Processing message: {message}")  
+        print(f"Processing message: {message}")
+        user_conversation = self.conversationhistory[user_id]
+        response = self.factory.run_conversation(user_conversation)
+        print(response)
+        self.send_message(user_id,response)
+        #I need to get the conversation of the user and send to the factory
+
+    def send_message(self, user_id, message):
+        messages = {"user":user_id,"message":message}
+        response = requests.post("http://localhost:5000/privatechat",data=messages)
 
     def check_messages(self):
         messages = ""
@@ -40,5 +48,9 @@ class NuggetAGI:
         return
     
     def start_conversation(self,message):
-        self.conversationhistory.append({"user":message['user'], "messages":[{"role":"system","message":self.standard_prompt},{"role":"user","message":message['message']}]})
+        user_id = message['user']
+        self.conversationhistory[user_id] = [
+            {"role":"system","content":self.standard_prompt},
+            {"role":"user","content":message['message']}
+        ]
         return        
