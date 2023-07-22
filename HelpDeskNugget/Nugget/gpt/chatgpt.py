@@ -1,6 +1,7 @@
 import openai
 import os
 from dotenv import load_dotenv
+import time
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -22,23 +23,17 @@ class ChatGPT:
 
     @staticmethod
     def chat_with_gpt3(messages):
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo-16k",
-            messages=messages,
-            temperature=0.9
-        )
-        return response['choices'][0]['message']['content']
-
-
-
-
-
+        retries = 20
+        delay = 5
         for i in range(retries):
             try:
-                
-                results = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k", messages=[{"role": "system", "content": chat_input}])
-                result =  str(results['choices'][0]['message']['content'])
-                print(result)
+                        
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo-16k",
+                    messages=messages,
+                    temperature=0.9
+                )
+                return response['choices'][0]['message']['content']
             except openai.error.ServiceUnavailableError:
                 if i < retries - 1:
                     time.sleep(delay)

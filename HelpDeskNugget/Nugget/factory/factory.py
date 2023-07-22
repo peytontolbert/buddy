@@ -40,12 +40,6 @@ class Factory:
         return clarify
     
 
-    def create_agent(self, task):
-        agent = Agent(task)
-
-        return agent
-    
-
 
 class AgentFactory:
     def create_agent(self, task):
@@ -53,18 +47,7 @@ class AgentFactory:
         return agent
     
 class Agent:
-    def __init__ (self, task):
-        self.task = task
-        self.memory = Memory()
-        self.tools = Tools()
-        self.actions = self._generate_actions()
+    def __init__ (self, goal):
+        self.goal = goal
+        self.tasklist = []
 
-    def _generate_actions(self):
-        # This method should generate a set of actions needed to complete the task
-        # The exact implementation will depend on how actions are represented in your system
-        pass
-
-    def execute_task(self):
-        # This method should execute the task by carrying out the actions
-        # The exact implementation will depend on your system
-        pass
