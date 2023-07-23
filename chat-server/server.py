@@ -1,9 +1,10 @@
 from flask import Flask, request, render_template, jsonify
+from flask_cors import CORS, cross_origin
 import json
 import threading
 # Initialize Flask app
 app = Flask(__name__)
-
+CORS(app, origins=['*'])
 messages = []
 chatbox = []
 unreaddm = []
@@ -40,6 +41,7 @@ def home():
     return render_template('/index.html')
 
 @app.route("/nuggetchat", methods=["POST"])
+@cross_origin()
 def nuggetchat():
     data = request.get_json()
     user = data.get('user')
