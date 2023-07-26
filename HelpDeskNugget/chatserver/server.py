@@ -37,7 +37,7 @@ def privatechat():
 
     if not message:
         return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
-
+    print(f"new message from: " + user)
     chatbox.append({'user': user, 'message': message})
     return jsonify({'status': 'success', 'message': 'AI Message received'}), 200
 
@@ -62,8 +62,9 @@ def nuggetchat():
     while not ai_response:
         for index, chat in enumerate(chatbox):
             # If a chat in the chatbox is from the AI and is a response to the user's message, get it
-            if chat['user'] == 'AI' and chat['message'] is not None:
+            if chat['user'] == user and chat['message'] is not None:
                 ai_response = chat['message']
+                print(ai_response)
                 del chatbox[index]  # Delete the chat dictionary from chatbox
                 break
 
@@ -75,18 +76,21 @@ def nuggetchat():
 @cross_origin()
 def nuggetgetchat():
     # Check if there are no messages
-    if len(chatbox) == 0:
+    if len(aichatbox) == 0:
         return jsonify({'message': 'No messages'}), 404
-    message = chatbox.copy()
-    chatbox.clear()
+    message = aichatbox.copy()
+    aichatbox.clear()
     # Return all messages
     return jsonify({'messages': message}), 200
 
 
 
 def run_server():
-    app.run(port=5000)  # Run the Flask app on port 5000
-
+    try:
+        app.run(port=5000)  # Run the Flask app on port 5000
+    except KeyboardInterrupt:
+        print('Keyboard interrupt received. Exiting.')
+        exit()
     
 if __name__ == "__main__":
     run_server()

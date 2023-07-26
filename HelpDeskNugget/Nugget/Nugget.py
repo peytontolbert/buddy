@@ -32,8 +32,10 @@ class NuggetAGI:
         #I need to get the conversation of the user and send to the factory
 
     def send_message(self, user_id, message):
+        print(user_id)
         messages = {"user":user_id,"message":message}
-        response = requests.post("http://localhost:5000/privatechat",data=messages)
+        requests.post("http://localhost:5000/privatechat",
+                      json=messages)
 
     def check_messages(self):
         messages = ""
