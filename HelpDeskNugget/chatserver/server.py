@@ -1,30 +1,18 @@
 from flask import Flask, request, render_template, jsonify
+from flask_cors import CORS, cross_origin
 import json
 import threading
 # Initialize Flask app
 app = Flask(__name__)
-
-messages = []
+chats = {}
 chatbox = []
-unreaddm = []
-finndm = []
-buddydm = []
-buddymessages = []
-creatordm = []
-nuggetchatbox = []
-oldmessages = []
+aichatbox = []
 # Function to save messages to a JSON file
 def save_messages():
     # Create a lock to synchronize access to the messages list
     with app.app_context():
         data = {
-            'messages': messages,
-            'chatbox': chatbox,
-            'nuggetchatbox': nuggetchatbox,
-            'unreaddm': unreaddm,
-            'buddydm': buddydm,
-            'creatordm': creatordm,
-            'oldmessages': oldmessages
+            'chatbox': chatbox
         }
         # Save the messages list to a JSON file
         with open('messages.json', 'w') as f:
@@ -39,7 +27,24 @@ save_messages()
 def home():
     return render_template('/index.html')
 
+
+@app.route("/privatechat", methods=["POST"])
+@cross_origin()
+def privatechat():
+    data = request.get_json()
+    user = data.get('user')
+    message = data.get('message')
+
+    if not message:
+        return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
+
+    chatbox.append({'user': user, 'message': message})
+    return jsonify({'status': 'success', 'message': 'AI Message received'}), 200
+
+
+
 @app.route("/nuggetchat", methods=["POST"])
+@cross_origin()
 def nuggetchat():
     data = request.get_json()
     user = data.get('user')
@@ -49,16 +54,31 @@ def nuggetchat():
     if not message:
         return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
     
-    nuggetchatbox.append({'user': user, 'message': message})
-    return jsonify({'status': 'success', 'message': 'Message received'}), 200
+    aichatbox.append({'user': user, 'message': message})
+
+    ai_response = None
+
+    # Continue to check the chatbox for the AI's response
+    while not ai_response:
+        for index, chat in enumerate(chatbox):
+            # If a chat in the chatbox is from the AI and is a response to the user's message, get it
+            if chat['user'] == 'AI' and chat['message'] is not None:
+                ai_response = chat['message']
+                del chatbox[index]  # Delete the chat dictionary from chatbox
+                break
+
+    return jsonify({'role': 'assistant', 'message': ai_response}), 200
+
+
 
 @app.route("/nuggetchat", methods=["GET"])
+@cross_origin()
 def nuggetgetchat():
     # Check if there are no messages
-    if len(nuggetchatbox) == 0:
+    if len(chatbox) == 0:
         return jsonify({'message': 'No messages'}), 404
-    message = nuggetchatbox.copy()
-    nuggetchatbox.clear()
+    message = chatbox.copy()
+    chatbox.clear()
     # Return all messages
     return jsonify({'messages': message}), 200
 

@@ -40,6 +40,19 @@ save_messages()
 def home():
     return render_template('/index.html')
 
+@app.route("/privatechat", methods=["POST"])
+@cross_origin()
+def privatechat():
+    data = request.get_json()
+    user = data.get('user')
+    message = data.get('message')
+
+    if not message:
+        return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
+
+    nuggetchatbox.append({'user': user, 'message': message})
+    return jsonify({'status': 'success', 'message': 'AI Message received'}), 200
+
 @app.route("/nuggetchat", methods=["POST"])
 @cross_origin()
 def nuggetchat():
