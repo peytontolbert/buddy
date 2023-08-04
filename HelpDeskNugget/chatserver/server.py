@@ -55,7 +55,6 @@ def nuggetchat():
         return jsonify({'status': 'failure', 'error': 'Empty message'}), 400
     
     aichatbox.append({'user': user, 'message': message})
-
     ai_response = None
 
     # Continue to check the chatbox for the AI's response
