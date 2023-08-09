@@ -26,7 +26,7 @@ DURATION = 5  # Duration of recording in seconds
 MODEL = whisper.load_model("base")  # Load Whisper model
 OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 ELEVENLABS = os.getenv('ELEVENLABS_KEY')  # Replace with your Eleven Labs API key
-openai.api_key = "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"  # Set OpenAI API key
+openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
