@@ -111,6 +111,7 @@ def record_audio():
     sd.wait()
     wv.write(f"./recordings/{filename}.wav", recording, FREQ, sampwidth=2)   
     return filename
+
 def transcribe_audio(filename):
     audio = whisper.load_audio(f"./recordings/{filename}.wav")
     audio = whisper.pad_or_trim(audio)
