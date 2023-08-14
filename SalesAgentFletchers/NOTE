@@ -1,0 +1,37 @@
+English Script
+Setup and Preparation:
+
+Load necessary settings and create a folder for recordings if it doesn't exist.
+Define essential parameters such as sample frequency, recording duration, and load specific models for voice recognition.
+Retrieve API keys and configure them for OpenAI and Eleven Labs.
+Introduction:
+
+Get the first message, which is an introduction for the sales agent to follow.
+Convert this message into speech and play the audio.
+Record the audio from the user (sales agent) and transcribe it to text.
+Sales Pitch:
+
+Use the transcribed text to create a short sales pitch with the help of GPT-3.5.
+Convert the sales pitch response into speech and play it to the user.
+Record the user's response and transcribe it.
+Ongoing Interaction with Client:
+
+Continue with the following loop until specific criteria are met:
+a. Record the user's audio and transcribe it.
+b. Parse the client's details such as name and email from the transcription.
+c. If both name and email are obtained, proceed to send a farewell message and close the application.
+d. Otherwise, update the parsed information with the new client details.
+e. Print the current state of the parsed information.
+f. Create a response to close the call using GPT-3.5 and the transcribed text.
+g. Print the response, convert it to speech, and play it.
+h. Increment a counter to keep track of the interaction rounds.
+Closing the Interaction:
+
+If the client's name and email are successfully obtained, the application sends a farewell message:
+Convert the farewell text to speech.
+Play the farewell speech.
+Close the application, printing a farewell message with the client's details.
+Summary
+The script orchestrates a simulated interaction between a sales agent and a client. It guides the sales agent through the introduction, sales pitch, and closing of a call, using GPT-3.5 to generate responses and handle various stages of the conversation.
+
+The agent's speech is recorded and transcribed, allowing the program to parse client details and respond appropriately. If the client's name and email are obtained, the application sends a farewell message and closes.
