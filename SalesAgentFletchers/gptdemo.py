@@ -11,6 +11,11 @@ from pydub import AudioSegment
 from pydub.playback import play
 from dotenv import load_dotenv
 import time
+import numpy as np
+from bark import SAMPLE_RATE, generate_audio, preload_models
+from scipy.io.wavfile import write as write_wav
+from IPython.display import Audio
+
 
 # Constants and Configuration
 load_dotenv()
@@ -20,28 +25,38 @@ MODEL = whisper.load_model("base")  # Load Whisper model
 OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
 
+# download and load all models
+preload_models()
+
 # Data Initialization
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
-messages = [...]  # Define the messages as per the original code
+messages = [
+    {"role": "system", "content": """
+You are a coldcalling a customer right now as Rachel, when the client picks up the phone you need to be in character as Rachel a salesrepresentive from Neurovee. 
+
+[EXAMPLE] 
+Hi my name is Rachel, I hope I'm not disturbing you, I am calling from Neurovee is there any chance I could borrow a minute of your time?
+
+"""}
+]
 
 
 salespitchprompt = """
-You need to make a short sales pitch to generate a sale for the company Neurovee. Here are some important information about the product you are selling:
+You are a cold calling sales agent, the customer just picked up the phone, make a short sales pitch to generate a lead for the company Neurovee. Here are some important information about the product you are selling:
 
 The most effective and cutting-edge technology on the market.
 Neurovee has a list of autonomous products such as Autonomous Sales, Autonomous HR, and more.
 
 [REMEMBER] Keep the pitch short, below 3 sentences!
-
 """
 
 closeoutprompt = """
 
-Try to close out the call and create a lead. Attempt to collect their name and email to send them more information about the product.
+Try to close out the call and create a lead. Attempt to collect their name and number to send them more information about the product.
 
 If they are not interested, ask them if there is anything you can do to change their mind.
 
-Remember to make sure you actually collect their email address, phone number and name. If you do not collect any of the information, keep trying.
+Remember to make sure you actually collect their phone number and name. If you do not collect any of the information, keep trying.
 
 """
 
@@ -59,6 +74,7 @@ class ChatGPT:
                     messages=messages,
                     temperature=0.9
                 )
+                print(response)
                 return response['choices'][0]['message']['content']
             except openai.error.ServiceUnavailableError:
                 if i < retries - 1:
@@ -70,11 +86,71 @@ class ChatGPT:
 
 # Helper Functions
 def text_to_speech(text, filename):
+    audio_array = generate_audio(text)
+    write_wav(filename, SAMPLE_RATE, audio_array)
+    Audio(audio_array, rate=SAMPLE_RATE)
+
+def text_to_speechold(text, filename):
     CHUNK_SIZE = 100
     url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream"  # replace with the voice ID
-    # Additional code to make the API request and save the audio file
-    
-def record_audio():
+
+    headers = {
+      "Accept": "audio/mpeg",
+      "Content-Type": "application/json",
+      "xi-api-key": "d86678cade0e6c64ebdf89691e016064"  # replace with your API key
+    }
+    data = {
+      "text": text,
+      "model_id": "eleven_monolingual_v1",
+      "voice_settings": {
+        "stability": 0.25,
+        "similarity_boost": 0.5
+      }
+    }
+    response = requests.post(url, json=data, headers=headers)
+    print(response.status_code)
+    with open(filename, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            if chunk:
+                f.write(chunk)
+
+def record_audio(silence_threshold=0.05, silence_duration=1.0):
+    print('Recording')
+    ts = datetime.datetime.now()
+    filename = ts.strftime("%Y-%m-%d_%H-%M-%S")  # Changed ':' to '_'
+    filepath = f"./recordings/{filename}.wav"
+
+    # Continuous recording function
+    with sd.InputStream(samplerate=FREQ, channels=1) as stream:
+        audio_frames = []
+        silent_chunks = 0
+        silence_chunk_duration = int(FREQ * silence_duration / DURATION)  # Number of chunks of silence before stopping
+
+        while True:
+            audio_chunk, overflowed = stream.read(DURATION)
+            audio_frames.append(audio_chunk)
+
+            # Check volume of the audio chunk
+            volume_norm = np.linalg.norm(audio_chunk) / len(audio_chunk)
+            
+            # If volume below the threshold, we consider it as silence
+            if volume_norm < silence_threshold:
+                silent_chunks += 1
+            else:
+                silent_chunks = 0
+
+            # If silence for a certain duration, stop recording
+            if silent_chunks > silence_chunk_duration:
+                break
+
+        # Save the audio
+        recording = np.concatenate(audio_frames, axis=0)
+        wv.write(filepath, recording, FREQ, sampwidth=2)
+
+    return filename
+
+
+def oldrecord_audio():
     print('Recording')
     ts = datetime.datetime.now()
     filename = ts.strftime("%Y-%m-%d_%H-%M-%S")  # Changed ':' to '_'
@@ -171,8 +247,8 @@ def setup():
 def introduction():
     script = first_message()
     text_to_speech(script, "response.mp3")
-    convert_mp3_to_wav("response.mp3", "response.wav")
-    play_audio("response.wav")
+    #convert_mp3_to_wav("response.mp3", "response.wav")
+    #play_audio("response.wav")
     filename = record_audio()
     transcription = transcribe_audio(filename)
     return transcription
@@ -187,15 +263,24 @@ def sales_pitch_section(transcription):
     transcription = transcribe_audio(filename)
     return transcription
 
+# Update Parsed Info
+def update_parsedinfo(parsedinfo, client_details):
+    # If the name is not yet filled and a name is found in the transcription
+    if not parsedinfo["name"] and client_details["name"]:
+        parsedinfo["name"] = client_details["name"]
+    # If the name is filled and the number is found in the transcription
+    elif parsedinfo["name"] and client_details["number"]:
+        parsedinfo["phonenumber"] = client_details["number"]
+    return parsedinfo
 # Ongoing Interaction with Client
 def ongoing_interaction():
     counter = 0
-    parsedinfo = {"name": "", "email": "", "phonenumber": ""}
+    parsedinfo = {"name": "", "phonenumber": ""}
     while True:
         filename = record_audio()
         transcription = transcribe_audio(filename)
         client_details = parse_client_details(transcription)
-        if client_details['name'] and client_details['email']:
+        if client_details['name'] and client_details['phonenumber']:
             send_farewell(client_details)
             exit()
         update_parsedinfo(parsedinfo, client_details)

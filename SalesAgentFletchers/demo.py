@@ -69,6 +69,7 @@ class ChatGPT:
                     messages=messages,
                     temperature=0.9
                 )
+                print(response)
                 return response['choices'][0]['message']['content']
             except openai.error.ServiceUnavailableError:
                 if i < retries - 1:
@@ -82,7 +83,7 @@ def text_to_speech(text, filename):
     headers = {
       "Accept": "audio/mpeg",
       "Content-Type": "application/json",
-      "xi-api-key": "d86678cade0e6c64ebdf89691e016064"  # replace with your API key
+      "xi-api-key": "a4ad2d04f6a4e977d90cb66e984ac594"  # replace with your API key
     }
     data = {
       "text": text,
