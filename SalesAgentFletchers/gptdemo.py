@@ -233,7 +233,7 @@ def close_call(transcription):
 def parse_client_details(transcription):
     client_details = {
         "name": parse_name(transcription),
-        "number": extract_number(transcription),
+        "number": parse_number(transcription),
     }
     return client_details
 
@@ -242,13 +242,24 @@ def play_audio(filename):
     play(audio)
 
 def parse_name(transcription):
-    # Splitting the transcription into words
-    words = transcription.split()
-    # Looking for capitalized words as potential names
-    name_candidates = [word for word in words if word.istitle()]
-    # Joining the name candidates to form a full name (this is a heuristic and might not be perfect)
-    name = " ".join(name_candidates)
-    return name
+    nameprompt="""You are an AI parser. 
+    Your job is to read the transcription and only reply with a name. 
+    Do not reply with anything else. If a name is not found, send a blank reply.
+    Only reply with one name."""
+    gptmessages=[{"role": "system", "content": nameprompt}, {"role": "user", "content": transcription}]
+    name = ChatGPT.chat_with_gpt3(gptmessages)
+    return name if name else ""
+
+
+def parse_number(transcription):
+    nameprompt="""You are an AI parser. 
+    Your job is to read the transcription and parse numbers. 
+    Do not reply with anything else. If a number is not found, send a blank reply.
+    Only reply with numbers from the transcription."""
+    gptmessages=[{"role": "system", "content": nameprompt}, {"role": "user", "content": transcription}]
+    name = ChatGPT.chat_with_gpt3(gptmessages)
+    return name if name else ""
+
 
 def extract_number(transcription):
     # Mapping words to digits
@@ -305,15 +316,15 @@ def update_parsedinfo(parsedinfo, client_details):
         parsedinfo["name"] = client_details["name"]
     # If the name is filled and the number is found in the transcription
     elif parsedinfo["name"] and client_details["number"]:
-        parsedinfo["phonenumber"] = client_details["number"]
+        parsedinfo["number"] = client_details["number"]
     return parsedinfo
 # Ongoing Interaction with Client
 def ongoing_interaction(transcription):
     counter = 0
-    parsedinfo = {"name": "", "phonenumber": ""}
+    parsedinfo = {"name": "", "number": ""}
     while True:
         client_details = parse_client_details(transcription)
-        if client_details['name'] and client_details['phonenumber']:
+        if client_details['name'] and client_details['number']:
             send_farewell(client_details)
             exit()
         update_parsedinfo(parsedinfo, client_details)
@@ -322,14 +333,14 @@ def ongoing_interaction(transcription):
         print(response)
         response_wav_path = f"response_{counter}.wav"
         text_to_speech(response)
+        filename = record_audio()
+        transcription = transcribe_audio(filename)
         counter += 1
 
 # Closing the Interaction
 def send_farewell(client_details):
     farewell = "Thank you for using our service. We will contact you shortly. Have a good day!"
-    text_to_speech(farewell, "farewell.mp3")
-    convert_mp3_to_wav("farewell.mp3", "farewell.wav")
-    play_audio("farewell.wav")
+    text_to_speech(farewell)
     print(f"Farewell sent. Closing application on customer: {client_details}")
 
 # Main Function

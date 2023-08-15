@@ -32,7 +32,7 @@ text2speech = Text2Speech.from_pretrained(
 
 # decide the input sentence by yourself
 print(f"Input your favorite sentence in {lang}.")
-x = input()
+x = "Hi, My name is Rachel and I'm calling from Neurovee, may I borrow a moment of your time?"
 
 # synthesis
 with torch.no_grad():
