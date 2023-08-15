@@ -2,10 +2,9 @@
 import sounddevice as sd
 import wavio as wv
 import datetime
-from espnet2.bin.tts_inference import Text2Speech
-from espnet2.utils.types import str_or_none
 import whisper
 import openai
+from faster_whisper import WhisperModel
 import os
 import re
 import requests
@@ -14,6 +13,7 @@ from pydub.playback import play
 from dotenv import load_dotenv
 import time
 import numpy as np
+from bark import SAMPLE_RATE, generate_audio, preload_models
 from scipy.io.wavfile import write as write_wav
 from IPython.display import Audio
 import torch
@@ -28,31 +28,8 @@ MODEL = whisper.load_model("base")  # Load Whisper model
 OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
 
-
-class TTS:
-    lang = 'English'
-    tag = 'kan-bayashi/ljspeech_vits' #@param ["kan-bayashi/ljspeech_tacotron2", "kan-bayashi/ljspeech_fastspeech", "kan-bayashi/ljspeech_fastspeech2", "kan-bayashi/ljspeech_conformer_fastspeech2", "kan-bayashi/ljspeech_joint_finetune_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_joint_train_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_vits"] {type:"string"}
-    vocoder_tag = "none" #@param ["none", "parallel_wavegan/ljspeech_parallel_wavegan.v1", "parallel_wavegan/ljspeech_full_band_melgan.v2", "parallel_wavegan/ljspeech_multi_band_melgan.v2", "parallel_wavegan/ljspeech_hifigan.v1", "parallel_wavegan/ljspeech_style_melgan.v1"] {type:"string"}
-
-    text2speech = Text2Speech.from_pretrained(
-        model_tag=str_or_none(tag),
-        vocoder_tag=str_or_none(vocoder_tag),
-        device="cuda",
-        # Only for Tacotron 2 & Transformer
-        threshold=0.5,
-        # Only for Tacotron 2
-        minlenratio=0.0,
-        maxlenratio=10.0,
-        use_att_constraint=False,
-        backward_window=1,
-        forward_window=3,
-        # Only for FastSpeech & FastSpeech2 & VITS
-        speed_control_alpha=1.0,
-        # Only for VITS
-        noise_scale=0.333,
-        noise_scale_dur=0.333,
-    )
-
+# download and load all models
+preload_models()
 
 # Data Initialization
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
@@ -111,19 +88,12 @@ class ChatGPT:
 
 
 # Helper Functions
-def text_to_speech(text):
-        # synthesis
-    with torch.no_grad():
-        start = time.time()
-        wav = TTS.text2speech(text)["wav"]
-    rtf = (time.time() - start) / (len(wav) / TTS.text2speech.fs)
-    #print(f"RTF = {rtf:5f}")
-    sd.play(wav.view(-1).cpu().numpy(), samplerate=TTS.text2speech.fs)
-    sd.wait()  # Wait until audio playback is done
-
+def text_to_speech(text, filename):
+    audio_array = generate_audio(text)
+    write_wav(filename, SAMPLE_RATE, audio_array)
+    Audio(audio_array, rate=SAMPLE_RATE)
 
 def text_to_speechold(text, filename):
-
     CHUNK_SIZE = 100
     url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream"  # replace with the voice ID
 
@@ -159,8 +129,6 @@ def record_audio(silence_threshold=0.05, silence_duration=1.0):
         silent_chunks = 0
         silence_chunk_duration = int(FREQ * silence_duration / DURATION)  # Number of chunks of silence before stopping
 
-        has_input = False  # Flag to check if there's any non-silent input
-
         while True:
             audio_chunk, overflowed = stream.read(DURATION)
             audio_frames.append(audio_chunk)
@@ -170,14 +138,12 @@ def record_audio(silence_threshold=0.05, silence_duration=1.0):
             
             # If volume below the threshold, we consider it as silence
             if volume_norm < silence_threshold:
-                if has_input:  # Only increment silent_chunks if we've had non-silent input
-                    silent_chunks += 1
+                silent_chunks += 1
             else:
                 silent_chunks = 0
-                has_input = True  # Set the flag when we detect non-silent input
 
-            # If silence for a certain duration after non-silent input, stop recording
-            if silent_chunks > silence_chunk_duration and has_input:
+            # If silence for a certain duration, stop recording
+            if silent_chunks > silence_chunk_duration:
                 break
 
         # Save the audio
@@ -213,7 +179,7 @@ def convert_mp3_to_wav(mp3_path, wav_path):
 
 def sales_pitch(transcription):
     messages.append({"role": "user", "content": transcription})
-    messages.append({"role": "assistant", "content": salespitchprompt})
+    messages.append({"role": "system", "content": salespitchprompt})
     response = ChatGPT.chat_with_gpt3(messages)
     messages.append({"role": "assistant", "content": response})
     return response
@@ -283,7 +249,7 @@ def setup():
 # Introduction
 def introduction():
     script = first_message()
-    text_to_speech(script)
+    text_to_speech(script, "response.mp3")
     #convert_mp3_to_wav("response.mp3", "response.wav")
     #play_audio("response.wav")
     filename = record_audio()
@@ -293,7 +259,9 @@ def introduction():
 # Sales Pitch
 def sales_pitch_section(transcription):
     response = sales_pitch(transcription)
-    text_to_speech(response)
+    text_to_speech(response, "response.mp3")
+    convert_mp3_to_wav("response.mp3", "response.wav")
+    play_audio("response.wav")
     filename = record_audio()
     transcription = transcribe_audio(filename)
     return transcription
@@ -308,10 +276,12 @@ def update_parsedinfo(parsedinfo, client_details):
         parsedinfo["phonenumber"] = client_details["number"]
     return parsedinfo
 # Ongoing Interaction with Client
-def ongoing_interaction(transcription):
+def ongoing_interaction():
     counter = 0
     parsedinfo = {"name": "", "phonenumber": ""}
     while True:
+        filename = record_audio()
+        transcription = transcribe_audio(filename)
         client_details = parse_client_details(transcription)
         if client_details['name'] and client_details['phonenumber']:
             send_farewell(client_details)
@@ -320,8 +290,11 @@ def ongoing_interaction(transcription):
         print("Parsed Info:", parsedinfo)
         response = close_call(transcription)
         print(response)
+        response_mp3_path = f"response_{counter}.mp3"
         response_wav_path = f"response_{counter}.wav"
-        text_to_speech(response)
+        text_to_speech(response, response_mp3_path)
+        convert_mp3_to_wav(response_mp3_path, response_wav_path)
+        play_audio(response_wav_path)
         counter += 1
 
 # Closing the Interaction
@@ -337,7 +310,7 @@ def main():
     setup()
     transcription = introduction()
     response = sales_pitch_section(transcription)
-    ongoing_interaction(response)
+    ongoing_interaction()
 
 if __name__ == "__main__":
     main()
