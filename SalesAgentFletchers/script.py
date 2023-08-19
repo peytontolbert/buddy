@@ -6,8 +6,8 @@ import sounddevice as sd
 from IPython.display import display, Audio
 
 lang = 'English'
-tag = 'kan-bayashi/ljspeech_vits' #@param ["kan-bayashi/ljspeech_tacotron2", "kan-bayashi/ljspeech_fastspeech", "kan-bayashi/ljspeech_fastspeech2", "kan-bayashi/ljspeech_conformer_fastspeech2", "kan-bayashi/ljspeech_joint_finetune_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_joint_train_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_vits"] {type:"string"}
-vocoder_tag = "none" #@param ["none", "parallel_wavegan/ljspeech_parallel_wavegan.v1", "parallel_wavegan/ljspeech_full_band_melgan.v2", "parallel_wavegan/ljspeech_multi_band_melgan.v2", "parallel_wavegan/ljspeech_hifigan.v1", "parallel_wavegan/ljspeech_style_melgan.v1"] {type:"string"}
+tag = 'kan-bayashi/ljspeech_tacotron2' #@param ["kan-bayashi/ljspeech_tacotron2", "kan-bayashi/ljspeech_vits", "kan-bayashi/ljspeech_fastspeech", "kan-bayashi/ljspeech_fastspeech2", "kan-bayashi/ljspeech_conformer_fastspeech2", "kan-bayashi/ljspeech_joint_finetune_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_joint_train_conformer_fastspeech2_hifigan", "kan-bayashi/ljspeech_vits"] {type:"string"}
+vocoder_tag = "parallel_wavegan/ljspeech_full_band_melgan.v2" #@param ["none", "parallel_wavegan/ljspeech_parallel_wavegan.v1", "parallel_wavegan/ljspeech_full_band_melgan.v2", "parallel_wavegan/ljspeech_multi_band_melgan.v2", "parallel_wavegan/ljspeech_hifigan.v1", "parallel_wavegan/ljspeech_style_melgan.v1"] {type:"string"}
 
 
 text2speech = Text2Speech.from_pretrained(
@@ -32,7 +32,7 @@ text2speech = Text2Speech.from_pretrained(
 
 # decide the input sentence by yourself
 print(f"Input your favorite sentence in {lang}.")
-x = "Hi, My name is Rachel and I'm calling from Neurovee, may I borrow a moment of your time?"
+x = input()
 
 # synthesis
 with torch.no_grad():

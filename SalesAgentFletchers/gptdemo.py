@@ -58,7 +58,7 @@ class TTS:
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
-You are a coldcalling a customer right now as Rachel, when the client picks up the phone you need to be in character as Rachel a salesrepresentive from Neurovee. 
+You are coldcalling a customer right now as Rachel, when the client picks up the phone you need to be in character as Rachel a salesrepresentive from Neurovee. 
 
 [EXAMPLE] 
 Hi my name is Rachel, I hope I'm not disturbing you, I am calling from Neurovee is there any chance I could borrow a minute of your time?
