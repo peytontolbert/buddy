@@ -89,7 +89,7 @@ class ChatGPT:
 
 def text_to_speech(text, filename):
     CHUNK_SIZE = 100
-    url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream"  # replace with the voice ID
+    url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?optimize_streaming_latency=3"  # replace with the voice ID
 
     headers = {
       "Accept": "audio/mpeg",
