@@ -2,12 +2,24 @@
 import sounddevice as sd
 import wavio as wv
 import datetime
+import json
 import whisper
 import openai
-from elevenlabs import generate, play, set_api_key
 import os
+import sys
 import re
 import requests
+from TTSTT2.hparams import create_hparams
+from TTSTT2.model import Tacotron2
+from TTSTT2.layers import TacotronSTFT
+from hifigan.audio_processing import griffin_lim
+from hifigan.denoiser import Denoiser
+from hifigan.env import AttrDict
+from hifigan.meldataset import mel_spectrogram, MAX_WAV_VALUE
+from hifigan.models import Generator
+import resampy
+import scipy.signal
+from text import text_to_sequence
 from pydub import AudioSegment
 #from pydub.playback import play
 from dotenv import load_dotenv
@@ -26,9 +38,13 @@ DURATION = 5  # Duration of recording in seconds
 MODEL = whisper.load_model("base")  # Load Whisper model
 OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
-LABS_KEY = os.getenv('LABS_KEY')
-set_api_key(LABS_KEY)
 # Data Initialization
+pronounciation_dictionary = False #@param {type:"boolean"}
+superres_strength = 10 #@param {type:"number"}
+thisdict = {}
+for line in reversed((open('merged.dict.txt', "r").read()).splitlines()):
+    thisdict[(line.split(" ",1))[0]] = (line.split(" ",1))[1].strip()
+
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
@@ -82,26 +98,124 @@ class ChatGPT:
                 else:
                     raise
 
+
+TACOTRON_MODEL = "Test-500"
+HIFIGAN_MODEL = "config_v1.json"
+
+# Load Tacotron2
+def load_tacotron(model_name):
+    hparams = create_hparams()
+    hparams.sampling_rate = 22050
+    model = Tacotron2(hparams)
+    checkpoint_path = os.path.join("models", model_name)
+    model.load_state_dict(torch.load(checkpoint_path)['state_dict'])
+    model = model.cuda().eval().half()
+    return model, hparams
+
+# Load HiFi-GAN
+def load_hifigan(MODEL_ID, conf_name):
+    conf = os.path.join("hifigan", conf_name)
+    with open(conf) as f:
+        json_config = json.loads(f.read())
+    h = AttrDict(json_config)
+    torch.manual_seed(h.seed)
+    hifigan = Generator(h).to(torch.device("cuda"))
+    # Assuming your HiFi-GAN model is named similarly to your Tacotron2 model but ends with '_hifigan'
+    if MODEL_ID == 1:
+        hifigan_model_path = os.path.join("models", "Superres_Twilight_33000")
+    else:
+        hifigan_model_path = os.path.join("models", "g_02500000")
+    state_dict_g = torch.load(hifigan_model_path, map_location=torch.device("cuda"))
+    hifigan.load_state_dict(state_dict_g["generator"])
+    hifigan.eval()
+    hifigan.remove_weight_norm()
+    denoiser = Denoiser(hifigan, mode="normal")
+    return hifigan, h, denoiser
+
+tacotron, tacotron_hparams = load_tacotron(TACOTRON_MODEL)
+hifigan, h, denoiser = load_hifigan("universal", HIFIGAN_MODEL) 
+hifigan_sr, h2, denoiser_sr = load_hifigan(1, "config_32k.json")
+def ARPA(text, punctuation=r"!?,.;", EOS_Token=True):
+    out = ''
+    for word_ in text.split(" "):
+        word=word_; end_chars = ''
+        while any(elem in word for elem in punctuation) and len(word) > 1:
+            if word[-1] in punctuation: end_chars = word[-1] + end_chars; word = word[:-1]
+            else: break
+        try:
+            word_arpa = thisdict[word.upper()]
+            word = "{" + str(word_arpa) + "}"
+        except KeyError: pass
+        out = (out + " " + word + end_chars).strip()
+    if EOS_Token and out[-1] != ";": out += ";"
+    return out
+
+
+def synthesize_audio(text, pronounciation_dictionary):
+    for i in [x for x in text.split("\n") if len(x)]:
+        if not pronounciation_dictionary:
+            if i[-1] != ";": i=i+";"
+        else: i = ARPA(i)
+        with torch.no_grad(): # save VRAM by not including gradients
+            sequence = np.array(text_to_sequence(text, ['english_cleaners']))[None, :]
+            sequence = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
+            mel_outputs, mel_outputs_postnet, _, alignments = tacotron.inference(sequence)
+            #if show_graphs:
+                #plot_data((mel_outputs_postnet.float().data.cpu().numpy()[0],
+                        #alignments.float().data.cpu().numpy()[0].T))
+            y_g_hat = hifigan(mel_outputs_postnet.float())
+            audio = y_g_hat.squeeze()
+            audio = audio * MAX_WAV_VALUE
+            audio_denoised = denoiser(audio.view(1, -1), strength=35)[:, 0]
+            # Resample to 32k
+            audio_denoised = audio_denoised.cpu().numpy().reshape(-1)
+            normalize = (MAX_WAV_VALUE / np.max(np.abs(audio_denoised))) ** 0.9
+            audio_denoised = audio_denoised * normalize
+            wave = resampy.resample(
+                audio_denoised,
+                h.sampling_rate,
+                h2.sampling_rate,
+                filter="sinc_window",
+                window=scipy.signal.windows.hann,
+                num_zeros=8,
+            )
+            wave_out = wave.astype(np.int16)
+
+            # HiFi-GAN super-resolution
+            wave = wave / MAX_WAV_VALUE
+            wave = torch.FloatTensor(wave).to(torch.device("cuda"))
+            new_mel = mel_spectrogram(
+                wave.unsqueeze(0),
+                h2.n_fft,
+                h2.num_mels,
+                h2.sampling_rate,
+                h2.hop_size,
+                h2.win_size,
+                h2.fmin,
+                h2.fmax,
+            )
+            y_g_hat2 = hifigan_sr(new_mel)
+            audio2 = y_g_hat2.squeeze()
+            audio2 = audio2 * MAX_WAV_VALUE
+            audio2_denoised = denoiser(audio2.view(1, -1), strength=35)[:, 0]
+
+            # High-pass filter, mixing and denormalizing
+            audio2_denoised = audio2_denoised.cpu().numpy().reshape(-1)
+            b = scipy.signal.firwin(
+                101, cutoff=10500, fs=h2.sampling_rate, pass_zero=False
+            )
+            y = scipy.signal.lfilter(b, [1.0], audio2_denoised)
+            y *= superres_strength
+            y_out = y.astype(np.int16)
+            y_padded = np.zeros(wave_out.shape)
+            y_padded[: y_out.shape[0]] = y_out
+            sr_mix = wave_out + y_padded
+            sr_mix = sr_mix / normalize
+            sd.play(sr_mix.astype(np.int16), samplerate=h2.sampling_rate)
+            sd.wait()  # Wait until audio playback is done
+
 def text_to_speech(text):
-    # Headers
-      headers = {
-        'Authorization': 
-"sk-jykawh4h2mbelub0ng5zrx8ujiyreofmtl5dete4449yjs6piggqgugnb6gvus8n69"
-      }
-      
-      # Data
-      data = {
-        'phone_number': '17573925302',
-        'task': "You are cold calling a customer from Neurovee to sell an autonomous sales agent",
-        'voice_id': 1,
-        'reduce_latency': True,
-        'request_data': {}
-      }
-    
-      # API request 
-      requests.post('https://api.bland.ai/call', json=data, headers=headers)
-
-
+    synthesize_audio(text, pronounciation_dictionary)
 
 def text_to_speech_old(text):
     audio = generate(
