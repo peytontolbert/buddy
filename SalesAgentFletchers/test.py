@@ -2,12 +2,27 @@
 import sounddevice as sd
 import wavio as wv
 import datetime
+import json
 import whisper
 import openai
-from elevenlabs import generate, play, set_api_key
 import os
+import sys
 import re
+from nltk.tokenize import sent_tokenize
+import nltk
 import requests
+from TTSTT2.hparams import create_hparams
+from TTSTT2.model import Tacotron2
+from TTSTT2.layers import TacotronSTFT
+from hifigan.audio_processing import griffin_lim
+from hifigan.denoiser import Denoiser
+from hifigan.env import AttrDict
+from hifigan.meldataset import mel_spectrogram, MAX_WAV_VALUE
+from hifigan.models import Generator
+import resampy
+import matplotlib.pyplot as plt
+import scipy.signal
+from text import text_to_sequence
 from pydub import AudioSegment
 #from pydub.playback import play
 from dotenv import load_dotenv
@@ -18,6 +33,7 @@ from IPython.display import Audio
 import torch
 print(torch.cuda.is_available())
 print(torch.cuda.device_count())
+nltk.download('punkt')
 print(torch.version.cuda)
 # Constants and Configuration
 load_dotenv()
@@ -26,16 +42,20 @@ DURATION = 5  # Duration of recording in seconds
 MODEL = whisper.load_model("base")  # Load Whisper model
 OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
-LABS_KEY = os.getenv('LABS_KEY')
-set_api_key(LABS_KEY)
 # Data Initialization
+pronounciation_dictionary = False #@param {type:"boolean"}
+superres_strength = 10 #@param {type:"number"}
+thisdict = {}
+for line in reversed((open('merged.dict.txt', "r").read()).splitlines()):
+    thisdict[(line.split(" ",1))[0]] = (line.split(" ",1))[1].strip()
+
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
-You are coldcalling a customer right now as Rachel, when the client picks up the phone you need to be in character as Rachel a salesrepresentive from Neurovee. 
+You are a cold calling sales agent named Peyton trying to sell autonomous agents for your company neurovee, when the client responds, you need to be in character as Rachel: a salesrepresentive from Neurovee. 
 
 [EXAMPLE] 
-Hi my name is Rachel, I hope I'm not disturbing you, I am calling from Neurovee is there any chance I could borrow a minute of your time?
+Hi my name is Peyton, I hope I'm not disturbing you, I am calling from Neurovee is there any chance I could borrow a minute of your time?
 
 """}
 ]
@@ -82,64 +102,144 @@ class ChatGPT:
                 else:
                     raise
 
+
+TACOTRON_MODEL = "Peyton-100"
+HIFIGAN_MODEL = "config_v1.json"
+
+# Load Tacotron2
+def load_tacotron(model_name):
+    hparams = create_hparams()
+    hparams.sampling_rate = 22050
+    model = Tacotron2(hparams)
+    checkpoint_path = os.path.join("models", model_name)
+    model.load_state_dict(torch.load(checkpoint_path)['state_dict'])
+    model = model.cuda().eval().half()
+    return model, hparams
+
+# Load HiFi-GAN
+def load_hifigan(MODEL_ID, conf_name):
+    conf = os.path.join("hifigan", conf_name)
+    with open(conf) as f:
+        json_config = json.loads(f.read())
+    h = AttrDict(json_config)
+    torch.manual_seed(h.seed)
+    hifigan = Generator(h).to(torch.device("cuda"))
+    # Assuming your HiFi-GAN model is named similarly to your Tacotron2 model but ends with '_hifigan'
+    if MODEL_ID == 1:
+        hifigan_model_path = os.path.join("models", "Superres_Twilight_33000")
+    else:
+        hifigan_model_path = os.path.join("models", "g_00000000peyton")
+    state_dict_g = torch.load(hifigan_model_path, map_location=torch.device("cuda"))
+    hifigan.load_state_dict(state_dict_g["generator"])
+    hifigan.eval()
+    hifigan.remove_weight_norm()
+    denoiser = Denoiser(hifigan, mode="normal")
+    return hifigan, h, denoiser
+
+tacotron, tacotron_hparams = load_tacotron(TACOTRON_MODEL)
+hifigan, h, denoiser = load_hifigan("universal", HIFIGAN_MODEL) 
+hifigan_sr, h2, denoiser_sr = load_hifigan(1, "config_32k.json")
+
+
+max_duration = 35 #@param {type:"integer"}
+tacotron.decoder.max_decoder_steps = max_duration * 80
+stop_threshold = .8 #@param {type:"number"}
+tacotron.decoder.gate_threshold = stop_threshold
+
+def ARPA(text, punctuation=r"!?,.;", EOS_Token=True):
+    out = ''
+    for word_ in text.split(" "):
+        word=word_; end_chars = ''
+        while any(elem in word for elem in punctuation) and len(word) > 1:
+            if word[-1] in punctuation: end_chars = word[-1] + end_chars; word = word[:-1]
+            else: break
+        try:
+            word_arpa = thisdict[word.upper()]
+            word = "{" + str(word_arpa) + "}"
+        except KeyError: pass
+        out = (out + " " + word + end_chars).strip()
+    if EOS_Token and out[-1] != ";": out += ";"
+    return out
+
+
+def synthesize_audio(text, pronounciation_dictionary):
+    for i in [x for x in text.split("\n") if len(x)]:
+        if not pronounciation_dictionary:
+            if i[-1] != ";": i=i+";"
+        else: i = ARPA(i)
+        with torch.no_grad(): # save VRAM by not including gradients
+            sequence = np.array(text_to_sequence(i, ['english_cleaners']))[None, :]
+            sequence = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
+            mel_outputs, mel_outputs_postnet, _, alignments = tacotron.inference(sequence)
+            
+            #if show_graphs:
+                #plot_data((mel_outputs_postnet.float().data.cpu().numpy()[0],
+                        #alignments.float().data.cpu().numpy()[0].T))
+            # Plotting the mel-spectrogram
+            plt.imshow(mel_outputs_postnet[0].cpu().detach().numpy(), origin="lower", aspect="auto")
+            plt.title("Mel-Spectrogram")
+            plt.colorbar()
+            plt.show()
+            y_g_hat = hifigan(mel_outputs_postnet.float())
+            audio = y_g_hat.squeeze()
+            audio = audio * MAX_WAV_VALUE
+            audio_denoised = denoiser(audio.view(1, -1), strength=35)[:, 0]
+            # Resample to 32k
+            audio_denoised = audio_denoised.cpu().numpy().reshape(-1)
+            normalize = (MAX_WAV_VALUE / np.max(np.abs(audio_denoised))) ** 0.9
+            audio_denoised = audio_denoised * normalize
+            wave = resampy.resample(
+                audio_denoised,
+                h.sampling_rate,
+                h2.sampling_rate,
+                filter="sinc_window",
+                window=scipy.signal.windows.hann,
+                num_zeros=8,
+            )
+            wave_out = wave.astype(np.int16)
+
+            # HiFi-GAN super-resolution
+            wave = wave / MAX_WAV_VALUE
+            wave = torch.FloatTensor(wave).to(torch.device("cuda"))
+            new_mel = mel_spectrogram(
+                wave.unsqueeze(0),
+                h2.n_fft,
+                h2.num_mels,
+                h2.sampling_rate,
+                h2.hop_size,
+                h2.win_size,
+                h2.fmin,
+                h2.fmax,
+            )
+            y_g_hat2 = hifigan_sr(new_mel)
+            audio2 = y_g_hat2.squeeze()
+            audio2 = audio2 * MAX_WAV_VALUE
+            audio2_denoised = denoiser(audio2.view(1, -1), strength=35)[:, 0]
+
+            # High-pass filter, mixing and denormalizing
+            audio2_denoised = audio2_denoised.cpu().numpy().reshape(-1)
+            b = scipy.signal.firwin(
+                101, cutoff=10500, fs=h2.sampling_rate, pass_zero=False
+            )
+            y = scipy.signal.lfilter(b, [1.0], audio2_denoised)
+            y *= superres_strength
+            y_out = y.astype(np.int16)
+            y_padded = np.zeros(wave_out.shape)
+            y_padded[: y_out.shape[0]] = y_out
+            sr_mix = wave_out + y_padded
+            sr_mix = sr_mix / normalize
+            sd.play(sr_mix.astype(np.int16), samplerate=h2.sampling_rate)
+            sd.wait()  # Wait until audio playback is done
+
 def text_to_speech(text):
-    # Headers
-      headers = {
-        'Authorization': 
-"sk-jykawh4h2mbelub0ng5zrx8ujiyreofmtl5dete4449yjs6piggqgugnb6gvus8n69"
-      }
-      
-      # Data
-      data = {
-        'phone_number': '17573925302',
-        'task': "You are cold calling a customer from Neurovee to sell an autonomous sales agent",
-        'voice_id': 1,
-        'reduce_latency': True,
-        'request_data': {}
-      }
-    
-      # API request 
-      requests.post('https://api.bland.ai/call', json=data, headers=headers)
+    synthesize_audio(text, pronounciation_dictionary)
 
-
-
-def text_to_speech_old(text):
-    audio = generate(
-    text=text,
-    voice="Bella"
-)
-    play(audio)
-
-
-def text_to_speechold(text, filename):
-    CHUNK_SIZE = 1024
-    url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?optimize_streaming_latency=3"  # replace with the voice ID
-
-    headers = {
-      "Accept": "audio/mpeg",
-      "Content-Type": "application/json",
-      "xi-api-key": "d86678cade0e6c64ebdf89691e016064"  # replace with your API key
-    }
-    data = {
-      "text": text,
-      "model_id": "eleven_monolingual_v1",
-      "voice_settings": {
-        "stability": 0.25,
-        "similarity_boost": 0.5
-      }
-    }
-    response = requests.post(url, json=data, headers=headers)
-    print(response.status_code)
-    with open(filename, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-            if chunk:
-                f.write(chunk)
-
-def record_audio(silence_threshold=0.05, silence_duration=1.0):
+def record_audio(silence_threshold=0.05, silence_duration=1.0, min_duration=3.0):
     print('Recording')
     ts = datetime.datetime.now()
     filename = ts.strftime("%Y-%m-%d_%H-%M-%S")  # Changed ':' to '_'
     filepath = f"./recordings/{filename}.wav"
+    min_chunks = int(FREQ * min_duration / DURATION)  # Minimum number of chunks to record
 
     # Continuous recording function
     with sd.InputStream(samplerate=FREQ, channels=1) as stream:
@@ -148,6 +248,8 @@ def record_audio(silence_threshold=0.05, silence_duration=1.0):
         silence_chunk_duration = int(FREQ * silence_duration / DURATION)  # Number of chunks of silence before stopping
 
         has_input = False  # Flag to check if there's any non-silent input
+        total_chunks = 0  # Counter for total chunks recorded
+
 
         while True:
             audio_chunk, overflowed = stream.read(DURATION)
@@ -163,25 +265,16 @@ def record_audio(silence_threshold=0.05, silence_duration=1.0):
             else:
                 silent_chunks = 0
                 has_input = True  # Set the flag when we detect non-silent input
+            total_chunks+=1
 
             # If silence for a certain duration after non-silent input, stop recording
-            if silent_chunks > silence_chunk_duration and has_input:
+            if silent_chunks > silence_chunk_duration and has_input and total_chunks > min_chunks:
                 break
 
         # Save the audio
         recording = np.concatenate(audio_frames, axis=0)
         wv.write(filepath, recording, FREQ, sampwidth=2)
 
-    return filename
-
-
-def oldrecord_audio():
-    print('Recording')
-    ts = datetime.datetime.now()
-    filename = ts.strftime("%Y-%m-%d_%H-%M-%S")  # Changed ':' to '_'
-    recording = sd.rec(int(DURATION * FREQ), samplerate=FREQ, channels=1)
-    sd.wait()
-    wv.write(f"./recordings/{filename}.wav", recording, FREQ, sampwidth=2)
     return filename
 
 def transcribe_audio(filename):
@@ -224,11 +317,6 @@ def parse_client_details(transcription):
         "number": parse_number(transcription),
     }
     return client_details
-
-def play_audio(filename):
-    audio = AudioSegment.from_file(filename, format="mp3")
-    play(audio)
-
 def parse_name(transcription):
     nameprompt="""You are a name parser.
     Your job is to read the user response and parse a name if included in the text. 
@@ -249,7 +337,11 @@ def parse_name(transcription):
     """
     gptmessages=[{"role": "system", "content": nameprompt}, {"role": "user", "content": transcription}]
     name = ChatGPT.chat_with_gpt3(gptmessages)
-    return name if name != "no name" else ""
+    if name!="no name":
+        parsedname=True
+        return name
+    else:
+        return ""
 
 
 def parse_number(transcription):
@@ -272,7 +364,12 @@ def parse_number(transcription):
     """
     gptmessages=[{"role": "system", "content": numberprompt}, {"role": "user", "content": transcription}]
     name = ChatGPT.chat_with_gpt3(gptmessages)
-    return name if name != "no number" else ""
+    print(name)
+    if name!="no number":
+        parsednumber=True
+        return name
+    else:
+        return ""
 
 
 def extract_number(transcription):
@@ -338,7 +435,7 @@ def ongoing_interaction(transcription):
     parsedinfo = {"name": "", "number": ""}
     while True:
         client_details = parse_client_details(transcription)
-        if client_details['name'] and client_details['number']:
+        if client_details["name"]:
             send_farewell(client_details)
             exit()
         update_parsedinfo(parsedinfo, client_details)

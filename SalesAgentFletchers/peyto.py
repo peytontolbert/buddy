@@ -8,6 +8,8 @@ import openai
 import os
 import sys
 import re
+from nltk.tokenize import sent_tokenize
+import nltk
 import requests
 from TTSTT2.hparams import create_hparams
 from TTSTT2.model import Tacotron2
@@ -18,6 +20,7 @@ from hifigan.env import AttrDict
 from hifigan.meldataset import mel_spectrogram, MAX_WAV_VALUE
 from hifigan.models import Generator
 import resampy
+import matplotlib.pyplot as plt
 import scipy.signal
 from text import text_to_sequence
 from pydub import AudioSegment
@@ -30,6 +33,7 @@ from IPython.display import Audio
 import torch
 print(torch.cuda.is_available())
 print(torch.cuda.device_count())
+nltk.download('punkt')
 print(torch.version.cuda)
 # Constants and Configuration
 load_dotenv()
@@ -40,6 +44,8 @@ OPENAI_API_KEY = os.getenv('OPENAI_KEY')  # Replace with your OpenAI API key
 openai.api_key = OPENAI_API_KEY  # Set OpenAI API key
 # Data Initialization
 pronounciation_dictionary = False #@param {type:"boolean"}
+
+parsedname, parsednumber = False, False
 superres_strength = 10 #@param {type:"number"}
 thisdict = {}
 for line in reversed((open('merged.dict.txt', "r").read()).splitlines()):
@@ -48,32 +54,22 @@ for line in reversed((open('merged.dict.txt', "r").read()).splitlines()):
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
-You are coldcalling a customer right now as Rachel, when the client picks up the phone you need to be in character as Rachel a salesrepresentive from Neurovee. 
+You are Peyton, and have been working on an autonomous agent. You are on a call with your mom discussing your invention. 
 
 [EXAMPLE] 
-Hi my name is Rachel, I hope I'm not disturbing you, I am calling from Neurovee is there any chance I could borrow a minute of your time?
+Hey Mom, this is Peyton. I am totally not a robot, and am your son
 
 """}
 ]
 
 
 salespitchprompt = """
-You are a cold calling sales agent, the customer just picked up the phone, make a short sales pitch to generate a lead for the company Neurovee. Here are some important information about the product you are selling:
-
-The most effective and cutting-edge technology on the market.
-Neurovee has a list of autonomous products such as Autonomous Sales, Autonomous HR, and more.
-
-[REMEMBER] Keep the pitch short, below 3 sentences!
+Act as Peyton and give short responses. continue the conversation about your week, all you've been doing is building and working. Oh yeah and your tattoo is thursday, dont forget to ask your mom to watch the dogs sometime.
+[REMEMBER] Keep responses short, only 1-2 sentences!
 """
 
 closeoutprompt = """
-
-Try to close out the call and create a lead. Attempt to collect their name and number to send them more information about the product.
-
-If they are not interested, ask them if there is anything you can do to change their mind.
-
-Remember to make sure you actually collect their phone number and name. If you do not collect any of the information, keep trying.
-
+Try to h
 """
 
 class ChatGPT:
@@ -99,7 +95,7 @@ class ChatGPT:
                     raise
 
 
-TACOTRON_MODEL = "Test-500"
+TACOTRON_MODEL = "Peyton-100"
 HIFIGAN_MODEL = "config_v1.json"
 
 # Load Tacotron2
@@ -135,6 +131,13 @@ def load_hifigan(MODEL_ID, conf_name):
 tacotron, tacotron_hparams = load_tacotron(TACOTRON_MODEL)
 hifigan, h, denoiser = load_hifigan("universal", HIFIGAN_MODEL) 
 hifigan_sr, h2, denoiser_sr = load_hifigan(1, "config_32k.json")
+
+
+max_duration = 35 #@param {type:"integer"}
+tacotron.decoder.max_decoder_steps = max_duration * 80
+stop_threshold = .8 #@param {type:"number"}
+tacotron.decoder.gate_threshold = stop_threshold
+
 def ARPA(text, punctuation=r"!?,.;", EOS_Token=True):
     out = ''
     for word_ in text.split(" "):
@@ -160,9 +163,15 @@ def synthesize_audio(text, pronounciation_dictionary):
             sequence = np.array(text_to_sequence(i, ['english_cleaners']))[None, :]
             sequence = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
             mel_outputs, mel_outputs_postnet, _, alignments = tacotron.inference(sequence)
+            
             #if show_graphs:
                 #plot_data((mel_outputs_postnet.float().data.cpu().numpy()[0],
                         #alignments.float().data.cpu().numpy()[0].T))
+            # Plotting the mel-spectrogram
+            plt.imshow(mel_outputs_postnet[0].cpu().detach().numpy(), origin="lower", aspect="auto")
+            plt.title("Mel-Spectrogram")
+            plt.colorbar()
+            plt.show()
             y_g_hat = hifigan(mel_outputs_postnet.float())
             audio = y_g_hat.squeeze()
             audio = audio * MAX_WAV_VALUE
@@ -300,7 +309,6 @@ def parse_client_details(transcription):
         "number": parse_number(transcription),
     }
     return client_details
-
 def parse_name(transcription):
     nameprompt="""You are a name parser.
     Your job is to read the user response and parse a name if included in the text. 
@@ -419,7 +427,7 @@ def ongoing_interaction(transcription):
     parsedinfo = {"name": "", "number": ""}
     while True:
         client_details = parse_client_details(transcription)
-        if client_details['name'] and client_details['number']:
+        if parsedname==True and parsednumber==True:
             send_farewell(client_details)
             exit()
         update_parsedinfo(parsedinfo, client_details)
