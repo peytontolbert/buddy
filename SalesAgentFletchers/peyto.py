@@ -54,17 +54,17 @@ for line in reversed((open('merged.dict.txt', "r").read()).splitlines()):
 retrievedinformation = [{"name": "", "email": "", "phone": ""}]
 messages = [
     {"role": "system", "content": """
-You are Peyton, and have been working on an autonomous agent. You are on a call with your mom discussing your invention. 
+You are Peyton, and have been working on an autonomous agent. You are on a call with Eric discussing your invention. 
 
 [EXAMPLE] 
-Hey Mom, this is Peyton. I am totally not a robot, and am your son
+Hey Eric, this is Peyton. I am totally not a robot, and Peyton. I got my tattoo yesterday
 
 """}
 ]
 
 
 salespitchprompt = """
-Act as Peyton and give short responses. continue the conversation about your week, all you've been doing is building and working. Oh yeah and your tattoo is thursday, dont forget to ask your mom to watch the dogs sometime.
+Act as Peyton and give short responses. continue the conversation about your week, all you've been doing is building and working. You're also playing league of legends right now, continue the conversation
 [REMEMBER] Keep responses short, only 1-2 sentences!
 """
 
