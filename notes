@@ -1,4 +1,11 @@
-Autonomous Cognitive entity
+Agent network
+SQL database manager - 
+sqldbmanager.py - filled with functions and prompts on controlling and managing a database
+testunit.py - filled with functions to create unit test cases of code snippets aswell as API to run code
+
+
+
+
 WORKFLOWS: ['VOLITION', 'LISTEN', 'EMOTIONAL ADJUSTMENT', 'ERROR', 'STACK', 'CONNECTTOME', 'WORKINGLOOP']
 The agent should learn from its actions.
 Several layers of memories: working memorys (~12), thoughts (unfiltered thoughts), memories(consolidated thoughts). Several processes run non-stop to consolidate them.
