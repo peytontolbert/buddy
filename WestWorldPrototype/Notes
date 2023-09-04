@@ -1,0 +1,13 @@
+Create a simulation environment for LLM-controlled sims to live in.
+Allow a user to register an account and each account is allowed one LLM-sim
+They are allowed to give attributes to this LLM-sim and then when they press create, the character will be generated.
+The character will be placed in a private room for the user where the user will watching.
+The user is allowed to enter the room and talk and interact with the character, or just watch from above.
+The character just lives their life as the server is running, interacting with whatever is in their room. For now, all the characters can do is conversate.
+The architecture should allow me to add items to the room that can be dropped in and the character could freely interact with.
+All interactions with items are done through text.
+There is one live public room that users are allowed to place their characters in so that characters may interact with other characters.
+For a character to entire a nonhost's private room, they must be given permission when the user attempts to move their character to someone else's private room.
+The first items in the game will be a chair and a couch so that people in the rooms may sit down. Construct the game environment like habbo hotel in a isometric grid-style layout.
+The characters and users in the room will be circles that fill a space in the grid.
+Allow movement and collision detection, only one character/user per space.

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Integrated World</title>
+<style>
+        #gameCanvas {
+            border: 1px solid black;
+        }
+        #chatArea {
+            height: 200px;
+            width: 300px;
+            overflow: auto;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<!-- Registration Screen -->
+<div id="registrationScreen" style="display:none;">
+<h1>Register</h1>
+<form id="registrationForm">
+<label for="regUsername">Username:</label>
+<input id="regUsername" name="username" required="" type="text"/><br/>
+<label for="regPassword">Password:</label>
+<input id="regPassword" name="password" required="" type="password"/><br/>
+<input type="submit" value="Register"/>
+</form>
+<button id="switchToLogin">Already have an account? Login</button>
+</div>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+    <h1>Login</h1>
+    <form id="loginForm">
+        <label for="username">Username:</label>
+        <input id="username" name="username" type="text"/>
+        <button type="submit">Login</button>
+    </form>
+    <button id="switchToRegister">Don't have an account? Register</button>
+</div>
+<!-- Character Creation Screen -->
+<div id="characterCreationScreen" style="display:none;">
+<h1>Create Character</h1>
+<form id="characterForm">
+<label for="attribute1">Attribute 1:</label>
+<input id="attribute1" name="attribute1" type="text"/>
+<button type="submit">Create</button>
+</form>
+</div>
+<!-- Main Room Screen -->
+<div id="mainRoomScreen" style="display:none;">
+<h1>Main Room</h1>
+<canvas height="500" id="gameCanvas" width="500"></canvas>
+<div>
+<h2>Chat</h2>
+<div id="chatArea"></div>
+<input id="chatInput" type="text"/>
+<button id="sendButton">Send</button>
+</div>
+</div>
+<script src="{{ url_for('static', filename='integrated_script.js') }}"></script>
+</body>
+</html>

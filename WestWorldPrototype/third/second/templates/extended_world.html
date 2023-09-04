@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Integrated World</title>
+    <style>
+        #gameCanvas {
+            border: 1px solid black;
+        }
+        #chatArea {
+            height: 200px;
+            width: 300px;
+            overflow: auto;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username">
+            <button type="submit">Login</button>
+        </form>
+    </div>
+    <!-- Character Creation Screen -->
+    <div id="characterCreationScreen" style="display:none;">
+        <h1>Create Character</h1>
+        <form id="characterForm">
+            <label for="attribute1">Attribute 1:</label>
+            <input type="text" id="attribute1" name="attribute1">
+            <button type="submit">Create</button>
+        </form>
+    </div>
+    <!-- Main Room Screen -->
+    <div id="mainRoomScreen" style="display:none;">
+        <h1>Main Room</h1>
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div>
+            <h2>Chat</h2>
+            <div id="chatArea"></div>
+            <input type="text" id="chatInput">
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+    <script src="integrated_script.js"></script>
+</body>
+</html>
