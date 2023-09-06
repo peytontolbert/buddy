@@ -1,0 +1,15 @@
+/
+|-- app/
+|   |-- templates/
+|   |   |-- index.html
+|   |   |-- login.html
+|   |   |-- register.html
+|   |   |-- room.html
+|   |-- static/
+|   |   |-- styles.css
+|   |   |-- main.js
+|   |-- __init__.py
+|   |-- routes.py
+|   |-- models.py
+|-- run.py
+|-- users.json
