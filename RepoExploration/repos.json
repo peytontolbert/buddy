@@ -1,0 +1,58 @@
+[
+    {
+        "reponame": "babyagi",
+        "repourl": "https://github.com/yoheinakajima/babyagi"
+    },
+    {
+        "reponame": "llm-coder",
+        "repourl": "https://github.com/peytontolbert/llm-coder"
+    },
+    {
+        "reponame": "buddy",
+        "repourl": "https://github.com/peytontolbert/buddy"
+    },
+    {
+        "reponame": "TaskMatrix",
+        "repourl": "https://github.com/peytontolbert/TaskMatrix"
+    },
+    {
+        "reponame": "LLMAgentPapers",
+        "repourl": "https://github.com/peytontolbert/LLMAgentPapers"
+    },
+    {
+        "reponame": "modelscope-agent",
+        "repourl": "https://github.com/peytontolbert/modelscope-agent"
+    },
+    {
+        "reponame": "WizardLM",
+        "repourl": "https://github.com/peytontolbert/WizardLM"
+    },
+    {
+        "reponame": "gpt-pilot",
+        "repourl": "https://github.com/peytontolbert/gpt-pilot"
+    },
+    {
+        "reponame": "MetaGPT",
+        "repourl": "https://github.com/peytontolbert/MetaGPT"
+    },
+    {
+        "reponame": "factool",
+        "repourl": "https://github.com/peytontolbert/factool"
+    },
+    {
+        "reponame": "bark",
+        "repourl": "https://github.com/peytontolbert/bark"
+    },
+    {
+        "reponame": "Smarton-AI",
+        "repourl": "https://github.com/peytontolbert/Smarton-AI"
+    },
+    {
+        "reponame": "AgentForge",
+        "repourl": "https://github.com/peytontolbert/AgentForge"
+    },
+    {
+        "reponame": "automata",
+        "repourl": "https://github.com/peytontolbert/automata"
+    }
+]

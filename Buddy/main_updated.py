@@ -73,33 +73,23 @@ def selectSettings():
     global window
     layout = [
         [
-            sg.Text("Chat with FinnAGI", font=("Helvetica", 14)),
-            sg.Multiline(size=(50, 10), key="-CHATBOX-", disabled=True, autoscroll=True),
-            sg.InputText(size=(40, 1), key="-USERINPUT-"), 
-            sg.Button("Send", bind_return_key=True)
+            [sg.Text('Game Window', size=(15, 1))],
+            [sg.Button('Start'), sg.Button('Stop'), sg.Button('Exit')],
+            [sg.Text('Thoughts:', size=(10,1)), sg.Text('', key='-THOUGHTS-', size=(100,5))], # Display FinnAGI.thoughts
+            [sg.Text('Working Memory:', size=(15,1)), sg.Text('', key='-WORKING_MEMORY-', size=(100,5))], # Display FinnAGI.workingmemory
         ]
     ]
 
-    window = sg.Window("Proton Client", layout)
+    
+    [sg.Text("Chat with FinnAGI", font=("Helvetica", 14))],
+    [sg.Multiline(size=(50, 10), key="-CHATBOX-", disabled=True, autoscroll=True)],
+    [sg.InputText(size=(40, 1), key="-USERINPUT-"), sg.Button("Send", bind_return_key=True)],
+window = sg.Window("Proton Client", layout)
     main_thread = None
 
     while True:
         event, values = window.read()
-        if event == "Send":
-            # Capture user's message from the input box
-            user_message = values["-USERINPUT-"]
-            
-            # Append user's message to chatbox
-            window["-CHATBOX-"].print(f"You: {user_message}")
-            
-            # Get a response from FinnAGI (You should replace this with actual logic from Buddy.py)
-            agent_response = "Agent: " + user_message[::-1]  # Reverse the message as a dummy response
-            
-            # Append agent's message to chatbox
-            window["-CHATBOX-"].print(agent_response)
-            
-            # Clear user input
-            window["-USERINPUT-"].update("")
+
         if event == 'Start':
             if main_thread is None or not main_thread.is_alive():  # Check if the thread is not running
                 main_stop_event.clear()  # Clear the stop event
@@ -114,7 +104,22 @@ def selectSettings():
             window['-WORKING_MEMORY-'].update(working_memory)
         elif event == 'Exit' or event == sg.WIN_CLOSED:
             main_stop_event.set()  # Set the stop event
-            break
+                if event == "Send":
+            # Capture user's message from the input box
+            user_message = values["-USERINPUT-"]
+            
+            # Append user's message to chatbox
+            window["-CHATBOX-"].print(f"You: {user_message}")
+            
+            # Get a response from FinnAGI (You should replace this with actual logic from Buddy.py)
+            agent_response = "Agent: " + user_message[::-1]  # Reverse the message as a dummy response
+            
+            # Append agent's message to chatbox
+            window["-CHATBOX-"].print(agent_response)
+            
+            # Clear user input
+            window["-USERINPUT-"].update("")
+    break
     window.close()
 
 if __name__ == "__main__":

@@ -1,0 +1,18 @@
+Make a chatbot and a textbox where i can copy and paste information 
+into a textbox to save it to an ever increasing embedded database
+and allow the chatbot to query said information
+
+need to create a strong database that does not have duplicate information.
+easy copy and paste to add information from the user side
+
+
+
+
+example:
+
+[user pastes 50 code snippets of relevant machine learning functions]
+
+user asks chatbot if enough information is in the database to make a specific function or application
+
+chatbot template to take user question, query database and pull all relevant portions and then use another template to create code out of the relevant portions and further knowledge
+
