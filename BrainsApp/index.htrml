@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Editor</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body>
+
+<h1>Document Editor</h1>
+
+<textarea id="editor" rows="10" cols="50">
+{{ content }}
+</textarea>
+
+<button id="save">Save</button>
+
+<script>
+$("#save").click(function(){
+    var content = $("#editor").val();
+    $.ajax({
+        type: "POST",
+        url: "/",
+        contentType: "application/json",
+        data: JSON.stringify({ "content": content }),
+        success: function(response){
+            alert("Document saved.");
+        }
+    });
+});
+</script>
+
+</body>
+</html>
